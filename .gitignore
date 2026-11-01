@@ -10,3 +10,6 @@ build/
 *.jks
 *.keystore
 keystore.properties
+
+# Signaturschlüssel (nie committen)
+release-signing/

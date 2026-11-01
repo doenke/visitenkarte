@@ -82,9 +82,35 @@ Zertifikate (selbst signierte CA) funktionieren, wenn die CA in Android als Nutz
 
 ## Bauen & installieren
 
-* **GitHub Actions:** Jeder Push baut das APK – unter *Actions → Build → Artifacts* „visitenkarte-debug-apk“ herunterladen.
+* **Obtainium (empfohlen):** In Obtainium *App hinzufügen* → `https://github.com/doenke/visitenkarte`.
+  Obtainium findet die APK in den GitHub-Releases und meldet neue Versionen automatisch.
+* **Direkt:** APK unter [Releases](https://github.com/doenke/visitenkarte/releases) herunterladen.
+* **Testversion je Push:** *Actions → Build → Artifacts* „visitenkarte-debug-apk“ (nicht updatefähig, andere Signatur).
 * **Lokal:** Android Studio öffnen, oder `./gradlew assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`.
 * Tests: `./gradlew testDebugUnitTest`
+
+### Releases erstellen
+
+Ein Release entsteht durch einen Versions-Tag:
+
+```sh
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+oder in GitHub unter *Actions → Release → Run workflow* mit Versionsnummer (`X.Y.Z`). Der Workflow baut
+die signierte Release-APK und hängt sie als `visitenkarte-X.Y.Z.apk` an das GitHub-Release.
+
+Einmalig nötig sind diese Repository-Secrets (*Settings → Secrets and variables → Actions*):
+`SIGNING_KEYSTORE_BASE64` (Keystore, base64-kodiert), `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`,
+`SIGNING_KEY_PASSWORD`. Eigener Schlüssel:
+
+```sh
+keytool -genkeypair -storetype PKCS12 -keystore release.jks -alias visitenkarte \
+        -keyalg RSA -keysize 4096 -validity 36500
+base64 -w0 release.jks   # Ausgabe als SIGNING_KEYSTORE_BASE64
+```
+
+Immer denselben Schlüssel verwenden – sonst lassen sich Updates nicht installieren.
 
 Voraussetzungen: Android 8.0+ (API 26). NFC-Emulation braucht ein Gerät mit HCE (praktisch alle NFC-Handys).
 
