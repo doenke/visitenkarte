@@ -1,0 +1,33 @@
+{
+  "cards": [
+    {
+      "id": "business",
+      "title": "Geschäftlich",
+      "file": "geschaeftlich.vcf",
+      "color": "#1E3A5F"
+    },
+    {
+      "id": "private",
+      "title": "Privat",
+      "file": "privat.vcf",
+      "color": "#2E7D32"
+    }
+  ],
+  "documents": [
+    {
+      "id": "health",
+      "title": "Gesundheitsinfos",
+      "description": "Blutgruppe, Allergien, Medikamente, Notfallkontakte",
+      "file": "dokumente/gesundheit.html",
+      "icon": "health",
+      "assets": ["dokumente/style.css"]
+    },
+    {
+      "id": "patientenverfuegung",
+      "title": "Patientenverfügung",
+      "description": "Unterschriebene Fassung",
+      "file": "dokumente/patientenverfuegung.pdf",
+      "icon": "legal"
+    }
+  ]
+}

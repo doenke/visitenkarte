@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HTTPS mit System- und vom Nutzer installierten Zertifikaten (z. B. eigene CA für den Heimserver).
+  Unverschlüsseltes HTTP lässt die App nur für Hosts im lokalen Netz zu (Prüfung im Code).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
