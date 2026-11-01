@@ -12,12 +12,28 @@ android {
         applicationId = "de.soenkejacobs.visitenkarte"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Im Release-Workflow aus dem Git-Tag gesetzt (z. B. v1.2.0 -> 1.2.0)
+        versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
+    }
+
+    // Signatur für Releases: Schlüssel kommt aus Umgebungsvariablen (GitHub-Secrets).
+    // Immer derselbe Schlüssel, damit Updates (z. B. über Obtainium) installiert werden können.
+    val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
