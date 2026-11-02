@@ -31,12 +31,15 @@ data class DocumentItem(
     val icon: String?,
     val file: File,
     val mimeType: String,
+    val lock: Boolean = true,
 )
 
 data class ContentState(
     val cards: List<CardItem> = emptyList(),
     val documents: List<DocumentItem> = emptyList(),
     val loadError: String? = null,
+    /** true, sobald der lokale Stand gelesen wurde (auch wenn er leer ist). */
+    val loaded: Boolean = false,
 )
 
 sealed interface SyncState {
@@ -60,16 +63,29 @@ class Repository(private val context: Context, val settings: SettingsStore) {
     private val _content = MutableStateFlow(ContentState())
     val content: StateFlow<ContentState> = _content.asStateFlow()
 
+    private val _lastSync = MutableStateFlow(settings.lastSync)
+    /** Zeitpunkt des letzten erfolgreichen Abgleichs (0 = nie). */
+    val lastSync: StateFlow<Long> = _lastSync.asStateFlow()
+
     private val _sync = MutableStateFlow<SyncState>(SyncState.Idle)
     val sync: StateFlow<SyncState> = _sync.asStateFlow()
+
+    /** Wird nach jeder Änderung des lokalen Stands aufgerufen (z. B. Widgets aktualisieren). */
+    var onContentChanged: (() -> Unit)? = null
 
     suspend fun reload() = withContext(Dispatchers.IO) {
         _content.value = loadLocal()
     }
 
+    /** Aktueller Stand; lädt bei Bedarf von der Platte (z. B. für das Widget ohne laufende App). */
+    suspend fun snapshot(): ContentState {
+        if (!_content.value.loaded) reload()
+        return _content.value
+    }
+
     private fun loadLocal(): ContentState {
         recoverInterruptedSwap()
-        if (!manifestFile.exists()) return ContentState()
+        if (!manifestFile.exists()) return ContentState(loaded = true)
         return try {
             val manifest = Manifest.parse(manifestFile.readText())
             val paths = ContentPaths(settings.load().manifestUrl.ifBlank { "https://localhost/manifest.json" })
@@ -95,11 +111,11 @@ class Repository(private val context: Context, val settings: SettingsStore) {
             }
             val docs = manifest.documents.mapNotNull { d ->
                 val f = local(d.file) ?: return@mapNotNull null
-                DocumentItem(d.id, d.title, d.description, d.icon, f, d.type ?: guessMime(f.name))
+                DocumentItem(d.id, d.title, d.description, d.icon, f, d.type ?: guessMime(f.name), d.lock)
             }
-            ContentState(cards, docs)
+            ContentState(cards, docs, loaded = true)
         } catch (e: Exception) {
-            ContentState(loadError = "Lokale Daten konnten nicht gelesen werden: ${e.message}")
+            ContentState(loadError = "Lokale Daten konnten nicht gelesen werden: ${e.message}", loaded = true)
         }
     }
 
@@ -120,6 +136,7 @@ class Repository(private val context: Context, val settings: SettingsStore) {
             val result = runCatching { doSync(config) }
             result.onSuccess {
                 settings.lastSync = System.currentTimeMillis()
+                _lastSync.value = settings.lastSync
                 settings.lastError = null
                 _sync.value = SyncState.Done(it)
             }.onFailure {
@@ -129,6 +146,7 @@ class Repository(private val context: Context, val settings: SettingsStore) {
                 _sync.value = SyncState.Failed(msg)
             }
             _content.value = loadLocal()
+            onContentChanged?.invoke()
             result.fold({ Result.success(it) }, { Result.failure(IOException(humanMessage(it), it)) })
         }
     }

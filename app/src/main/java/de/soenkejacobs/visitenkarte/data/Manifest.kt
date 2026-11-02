@@ -28,6 +28,8 @@ data class Manifest(
         val description: String?,
         val icon: String?,
         val assets: List<String>,
+        /** false = auch ohne Entsperren zugänglich (z. B. Notfallinfos). */
+        val lock: Boolean = true,
     )
 
     /** Alle Dateien, die beim Synchronisieren geladen werden müssen. */
@@ -59,6 +61,7 @@ data class Manifest(
                     description = o.optStringOrNull("description"),
                     icon = o.optStringOrNull("icon"),
                     assets = o.optJSONArray("assets")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
+                    lock = o.optBoolean("lock", true),
                 )
             }
             return Manifest(cards, docs)

@@ -30,6 +30,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.soenkejacobs.visitenkarte.data.CardItem
+import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.data.QrCode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,7 +48,7 @@ fun QrScreen(card: CardItem, onBack: () -> Unit) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
-    val text = remember(card) { card.vcard.compactText() }
+    val text = remember(card) { activity.app.shareFilter.compactText(card) }
     val qr = remember(text) { runCatching { QrCode.render(text).asImageBitmap() } }
 
     Scaffold(

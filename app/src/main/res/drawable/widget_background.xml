@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Immer weiß, damit der QR-Code auch im Dark Mode scanbar bleibt -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFFFFF" />
+    <corners android:radius="20dp" />
+</shape>

@@ -36,6 +36,15 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.soenkejacobs.visitenkarte.app
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -84,6 +93,7 @@ fun CardsScreen(
     onNfc: (CardItem) -> Unit,
     page: Int = 0,
     onPageChanged: (Int) -> Unit = {},
+    lastSync: Long = 0,
 ) {
     PullToRefreshBox(isRefreshing = sync is SyncState.Running, onRefresh = onSync, modifier = modifier.fillMaxSize()) {
         if (content.cards.isEmpty()) {
@@ -99,6 +109,7 @@ fun CardsScreen(
         LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
         Column(Modifier.fillMaxSize()) {
+            StaleDataBanner(lastSync, onSync, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (content.cards.size > 1) {
                 PrimaryTabRow(selectedTabIndex = pager.currentPage.coerceAtMost(content.cards.lastIndex)) {
                     content.cards.forEachIndexed { i, c ->
@@ -121,6 +132,7 @@ fun CardsScreen(
                 ) {
                     BusinessCard(card)
                     ShareActions(card, onQr = { onQr(card) }, onNfc = { onNfc(card) })
+                    ShareScope(card)
                     ContactDetails(card)
                 }
             }
@@ -246,6 +258,44 @@ private fun ShareActions(card: CardItem, onQr: () -> Unit, onNfc: () -> Unit) {
             ActionButton(Icons.Default.Share, "Teilen", Modifier.weight(1f)) { ShareHelper.shareCard(context, card) }
             ActionButton(Icons.AutoMirrored.Filled.Send, "Quick Share", Modifier.weight(1f)) { ShareHelper.quickShareCard(context, card) }
         }
+    }
+}
+
+/** Zeigt, was geteilt wird, und öffnet die Auswahl. */
+@Composable
+private fun ShareScope(card: CardItem) {
+    val filter = LocalContext.current.app.shareFilter
+    val all by filter.excluded.collectAsStateWithLifecycle()
+    val entries = remember(card.vcard) { card.vcard.shareableEntries() }
+    val excluded = all[card.id].orEmpty()
+    val omitted = entries.filter { it.key in excluded }
+    var showDialog by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (omitted.isEmpty()) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+            null,
+            Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (omitted.isEmpty()) "Alle Angaben werden geteilt"
+            else "Ohne: " + omitted.joinToString(", ") { it.label },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = { showDialog = true }) { Text("Auswählen") }
+    }
+    if (showDialog) {
+        ShareSelectionDialog(
+            entries = entries,
+            excluded = excluded,
+            onDismiss = { showDialog = false },
+            onSave = { filter.setExcluded(card.id, it); showDialog = false },
+        )
     }
 }
 

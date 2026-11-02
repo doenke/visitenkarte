@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import de.soenkejacobs.visitenkarte.data.CardItem
+import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.nfc.CardHceService
 import de.soenkejacobs.visitenkarte.nfc.NfcPayload
 import de.soenkejacobs.visitenkarte.nfc.Type4TagEmulator
@@ -65,7 +66,8 @@ fun NfcScreen(card: CardItem, onBack: () -> Unit) {
     var reads by remember { mutableIntStateOf(0) }
     var nfcEnabled by remember { mutableStateOf(adapter?.isEnabled == true) }
 
-    val message = remember(card) { NfcPayload.vcardMessage(card.vcard.compactText()) }
+    val filter = activity.app.shareFilter
+    val message = remember(card) { NfcPayload.vcardMessage(filter.compactText(card)) }
     val tooLarge = message.size > Type4TagEmulator.MAX_NDEF_SIZE
 
     DisposableEffect(Unit) {

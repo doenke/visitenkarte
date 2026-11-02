@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "de.soenkejacobs.visitenkarte"
-        minSdk = 26
+        minSdk = 31 // Android 12 (z. B. Galaxy S22) und neuer
         targetSdk = 35
         // Im Release-Workflow aus dem Git-Tag gesetzt (z. B. v1.2.0 -> 1.2.0)
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
@@ -67,6 +67,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

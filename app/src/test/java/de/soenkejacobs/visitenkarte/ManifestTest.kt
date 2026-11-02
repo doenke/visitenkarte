@@ -13,6 +13,9 @@ class ManifestTest {
         assertEquals(2, m.cards.size)
         assertTrue(m.documents.isNotEmpty())
         assertTrue(m.allFiles.contains("geschaeftlich.vcf"))
+        // Notfallinfos ohne Sperre, Patientenverfügung gesperrt (Standard)
+        assertEquals(false, m.documents.single { it.id == "health" }.lock)
+        assertEquals(true, m.documents.single { it.id == "patientenverfuegung" }.lock)
     }
 
     @Test
