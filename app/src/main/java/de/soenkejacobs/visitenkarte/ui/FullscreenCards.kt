@@ -179,6 +179,16 @@ private fun FullscreenCard(card: CardItem) {
                 lines.forEach {
                     Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                // Postanschrift: Straße (inkl. Zusatz) in einer Zeile, PLZ/Ort (Land nur, wenn nicht Deutschland) darunter
+                v.addresses.firstOrNull()?.let { adr ->
+                    val second = listOf(adr.cityLine, if (adr.isDomestic) "" else adr.country)
+                        .filter { it.isNotBlank() }.joinToString(", ")
+                    val addressLines = listOf(adr.streetLines.joinToString(", "), second).filter { it.isNotBlank() }
+                    if (addressLines.isNotEmpty()) Spacer(Modifier.height(6.dp))
+                    addressLines.forEach {
+                        Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
         }
 
