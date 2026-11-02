@@ -50,6 +50,16 @@ class SettingsStore(context: Context) {
         get() = prefs.getLong(KEY_LAST_SYNC, 0L)
         set(v) = prefs.edit().putLong(KEY_LAST_SYNC, v).apply()
 
+    /** Dokumente nur nach Fingerabdruck/Geräte-PIN öffnen. */
+    var lockDocuments: Boolean
+        get() = prefs.getBoolean(KEY_LOCK_DOCS, true)
+        set(v) = prefs.edit().putBoolean(KEY_LOCK_DOCS, v).apply()
+
+    /** Screenshots und App-Vorschau bei geschützten Dokumenten verhindern. */
+    var secureScreens: Boolean
+        get() = prefs.getBoolean(KEY_SECURE, true)
+        set(v) = prefs.edit().putBoolean(KEY_SECURE, v).apply()
+
     var lastError: String?
         get() = prefs.getString(KEY_LAST_ERROR, null)
         set(v) = prefs.edit().putString(KEY_LAST_ERROR, v).apply()
@@ -88,6 +98,8 @@ class SettingsStore(context: Context) {
         const val KEY_PASS = "pass"
         const val KEY_LAST_SYNC = "last_sync"
         const val KEY_LAST_ERROR = "last_error"
+        const val KEY_LOCK_DOCS = "lock_documents"
+        const val KEY_SECURE = "secure_screens"
         const val KEY_ALIAS = "visitenkarte_server_credentials"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val IV_LEN = 12

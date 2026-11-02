@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Visitenkarte</string>
     <string name="nfc_service_description">Visitenkarte per NFC teilen</string>
+    <string name="widget_description">QR-Code deiner Visitenkarte</string>
 </resources>

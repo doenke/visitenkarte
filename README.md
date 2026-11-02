@@ -15,6 +15,12 @@ Alle Inhalte kommen von deinem eigenen Webserver (HTTPS + Basic Auth) und werden
 | **Teilen** | Normaler Android-Teilen-Dialog mit `.vcf`-Datei (Messenger, Mail, …). |
 | **Quick Share** | Öffnet Quick Share (Google bzw. Samsung) direkt; falls nicht vorhanden, den Teilen-Dialog. |
 | **Dokumente** | PDF (eingebauter Viewer mit Zoom), HTML (offline, ohne JavaScript/Netz), Bilder, Text. Teilen und „Extern öffnen“ möglich. |
+| **Was wird geteilt?** | Pro Karte abwählbar (z. B. Privatadresse, Geburtstag). Gilt für QR-Code, NFC, Teilen, Quick Share, Vollbild und Widget – die eigene Anzeige zeigt weiter alles. |
+| **Shortcuts** | Lange auf das App-Icon tippen: „QR Geschäftlich“, „QR Privat“, „NFC …“ öffnen direkt die passende Ansicht. |
+| **Widget** | QR-Code einer Karte auf dem Startbildschirm. Tippen auf den Titel wechselt die Karte, Tippen auf den Code öffnet die App. |
+| **Querformat** | Handy drehen: aktuelle Karte im Vollbild mit QR-Code rechts unten, Wischen wechselt die Karte. |
+| **Dokumentensperre** | Dokumente öffnen nur nach Fingerabdruck/Gesicht/Geräte-PIN, bis die App verlassen wird. Optional keine Screenshots und keine Vorschau in der App-Übersicht. Einzelne Dokumente (z. B. Notfallinfos) per `"lock": false` frei zugänglich. |
+| **Veraltete Daten** | Hinweis mit „Abgleichen“-Knopf, wenn der letzte erfolgreiche Abgleich über 30 Tage her ist. |
 | **Server** | URL, Benutzer, Passwort. Passwort liegt verschlüsselt im Android Keystore. Abgleich beim Start (wenn > 1 h her), alle 12 h im Hintergrund und per Pull-to-Refresh. |
 
 **Offline:** Ein Abgleich ersetzt den lokalen Stand nur, wenn *alle* Dateien erfolgreich geladen wurden.
@@ -35,7 +41,7 @@ Lege einen Ordner auf deinem Webserver an, z. B. `https://example.de/visitenkart
   ],
   "documents": [
     { "id": "health", "title": "Gesundheitsinfos", "description": "Allergien, Medikamente",
-      "file": "dokumente/gesundheit.html", "icon": "health", "assets": ["dokumente/style.css"] },
+      "file": "dokumente/gesundheit.html", "icon": "health", "lock": false, "assets": ["dokumente/style.css"] },
     { "id": "pv", "title": "Patientenverfügung", "file": "dokumente/patientenverfuegung.pdf", "icon": "legal" }
   ]
 }
@@ -45,6 +51,7 @@ Lege einen Ordner auf deinem Webserver an, z. B. `https://example.de/visitenkart
 * `color`: Kartenfarbe (`#RRGGBB`), `photo`/`logo`: optional (alternativ `PHOTO` direkt in der vCard).
 * `type`: optionaler MIME-Typ, sonst anhand der Endung (`pdf`, `html`, `jpg`, `png`, `txt`, …).
 * `icon`: `health`, `notfall`, `legal` – sonst Symbol nach Dateityp.
+* `lock`: `false` = Dokument ist auch ohne Entsperren zugänglich (Standard: gesperrt, wenn die Sperre in der App aktiv ist).
 * `assets`: zusätzliche Dateien für HTML-Dokumente (CSS, Bilder), damit sie offline funktionieren.
 * Die `.vcf`-Dateien sind ganz normale vCards (3.0 oder 4.0, UTF-8) – z. B. aus deinem Adressbuch exportiert.
 
@@ -112,7 +119,7 @@ base64 -w0 release.jks   # Ausgabe als SIGNING_KEYSTORE_BASE64
 
 Immer denselben Schlüssel verwenden – sonst lassen sich Updates nicht installieren.
 
-Voraussetzungen: Android 8.0+ (API 26). NFC-Emulation braucht ein Gerät mit HCE (praktisch alle NFC-Handys).
+Voraussetzungen: Android 12+ (API 31), z. B. Galaxy S22 und neuer. NFC-Emulation braucht ein Gerät mit HCE (praktisch alle NFC-Handys).
 
 ## Hinweise zu NFC
 

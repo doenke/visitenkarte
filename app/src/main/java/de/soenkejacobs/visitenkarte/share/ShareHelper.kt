@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.data.CardItem
 import de.soenkejacobs.visitenkarte.data.DocumentItem
 import java.io.File
@@ -74,7 +75,8 @@ object ShareHelper {
     private fun cardIntent(context: Context, card: CardItem): Intent {
         val name = card.vcard.formattedName.ifBlank { "Visitenkarte" }
         val fileName = "${name}_${card.title}".replace(Regex("[^\\p{L}\\p{N}_-]+"), "_") + ".vcf"
-        val uri = exportFile(context, card.vcfFile, fileName)
+        // Nur die ausgewählten Angaben teilen
+        val uri = exportText(context, context.app.shareFilter.fullText(card), fileName)
         return sendIntent(uri, VCARD_MIME, "Visitenkarte $name")
     }
 
@@ -85,6 +87,13 @@ object ShareHelper {
         putExtra(Intent.EXTRA_TITLE, subject)
         clipData = ClipData.newRawUri(subject, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    private fun exportText(context: Context, text: String, name: String): Uri {
+        val dir = File(context.cacheDir, "share").apply { mkdirs() }
+        val target = File(dir, name.replace('/', '_').ifBlank { "karte.vcf" })
+        target.writeText(text)
+        return FileProvider.getUriForFile(context, "${context.packageName}.files", target)
     }
 
     /** Kopiert die Datei in den freigegebenen Cache-Ordner, damit Empfänger-Apps sie lesen können. */

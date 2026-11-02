@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,7 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -124,6 +127,8 @@ fun SettingsScreen(modifier: Modifier, vm: MainViewModel, content: ContentState,
         if (testing) CircularProgressIndicator(Modifier.size(24.dp))
         testResult?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
 
+        PrivacySettings(vm)
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Status", style = MaterialTheme.typography.titleMedium)
@@ -172,3 +177,39 @@ private val MANIFEST_EXAMPLE = """
   ]
 }
 """.trimIndent()
+
+@Composable
+private fun PrivacySettings(vm: MainViewModel) {
+    val lock by vm.lockDocuments.collectAsStateWithLifecycle()
+    val secure by vm.secureScreens.collectAsStateWithLifecycle()
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Datenschutz", style = MaterialTheme.typography.titleMedium)
+            SwitchRow(
+                title = "Dokumente sperren",
+                subtitle = "Öffnen nur mit Fingerabdruck, Gesicht oder Geräte-PIN. " +
+                    "Dokumente mit \"lock\": false im Manifest (z. B. Notfallinfos) bleiben frei zugänglich.",
+                checked = lock,
+                onChange = vm::setLockDocuments,
+            )
+            SwitchRow(
+                title = "Screenshots verhindern",
+                subtitle = "Bei geschützten Dokumenten keine Screenshots und keine Vorschau in der App-Übersicht.",
+                checked = secure,
+                enabled = lock,
+                onChange = vm::setSecureScreens,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
+}

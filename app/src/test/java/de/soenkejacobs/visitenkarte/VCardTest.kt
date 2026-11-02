@@ -87,4 +87,25 @@ class VCardTest {
     fun birthdayWithoutYear() {
         assertEquals("24.12.", VCard.parse("BEGIN:VCARD\nBDAY:--1224\nEND:VCARD").birthdayFormatted)
     }
+
+    @Test
+    fun filteredTextOmitsSelectedEntries() {
+        val v = VCard.parse(java.io.File("../server-beispiel/privat.vcf").readText())
+        val entries = v.shareableEntries()
+        val adr = entries.single { it.label.startsWith("Adresse") }
+        val bday = entries.single { it.label == "Geburtstag" }
+        assertEquals("Musterweg 12, Hamburg, 22085, Deutschland", adr.value)
+        assertEquals("12.04.1985", bday.value)
+        // Name ist nie abwählbar
+        assertFalse(entries.any { it.label == "N" || it.label == "Fn" })
+
+        val text = v.filteredText(setOf(adr.key, bday.key))
+        assertFalse(text.contains("ADR"))
+        assertFalse(text.contains("BDAY"))
+        assertTrue(text.contains("FN:Sönke Jacobs"))
+        assertTrue(text.contains("TEL;TYPE=CELL,HOME,PREF:+49 171 1234567"))
+        assertTrue(text.startsWith("BEGIN:VCARD") && text.trimEnd().endsWith("END:VCARD"))
+        // Schlüssel sind stabil (gleiche Datei -> gleiche Schlüssel)
+        assertEquals(entries.map { it.key }, VCard.parse(java.io.File("../server-beispiel/privat.vcf").readText()).shareableEntries().map { it.key })
+    }
 }

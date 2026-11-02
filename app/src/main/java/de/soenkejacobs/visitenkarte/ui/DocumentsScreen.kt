@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import android.view.WindowManager
 import android.webkit.WebView
+import androidx.activity.compose.LocalActivity
 import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,6 +84,8 @@ fun DocumentsScreen(
     sync: SyncState,
     onSync: () -> Unit,
     onOpen: (DocumentItem) -> Unit,
+    isLocked: (DocumentItem) -> Boolean = { false },
+    lastSync: Long = 0,
 ) {
     PullToRefreshBox(isRefreshing = sync is SyncState.Running, onRefresh = onSync, modifier = modifier.fillMaxSize()) {
         if (content.documents.isEmpty()) {
@@ -88,12 +93,16 @@ fun DocumentsScreen(
             return@PullToRefreshBox
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+            item { StaleDataBanner(lastSync, onSync, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             items(content.documents, key = { it.id }) { doc ->
                 ListItem(
                     modifier = Modifier.clickable { onOpen(doc) },
                     leadingContent = { Icon(iconFor(doc), null, tint = MaterialTheme.colorScheme.primary) },
                     headlineContent = { Text(doc.title) },
                     supportingContent = doc.description?.let { { Text(it) } },
+                    trailingContent = if (isLocked(doc)) {
+                        { Icon(Icons.Default.Lock, "Gesperrt", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    } else null,
                 )
                 HorizontalDivider()
             }
@@ -114,8 +123,14 @@ private fun iconFor(doc: DocumentItem): ImageVector = when (doc.icon?.lowercase(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocumentViewer(doc: DocumentItem, onBack: () -> Unit) {
+fun DocumentViewer(doc: DocumentItem, secure: Boolean = false, onBack: () -> Unit) {
     val context = LocalContext.current
+    // Keine Screenshots / keine Vorschau in der App-Übersicht
+    val window = LocalActivity.current?.window
+    DisposableEffect(secure, window) {
+        if (secure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { if (secure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
     Scaffold(
         topBar = {
             TopAppBar(

@@ -45,6 +45,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import de.soenkejacobs.visitenkarte.data.CardItem
+import androidx.compose.ui.platform.LocalContext
+import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.data.QrCode
 
 /**
@@ -114,7 +116,8 @@ private fun FullscreenCard(card: CardItem) {
     val photo = rememberPhoto(card)
     val logo = rememberImage(card.logoFile)
     val v = card.vcard
-    val qr = remember(card) { runCatching { QrCode.render(v.compactText()).asImageBitmap() }.getOrNull() }
+    val filter = LocalContext.current.app.shareFilter
+    val qr = remember(card) { runCatching { QrCode.render(filter.compactText(card)).asImageBitmap() }.getOrNull() }
 
     BoxWithConstraints(
         Modifier

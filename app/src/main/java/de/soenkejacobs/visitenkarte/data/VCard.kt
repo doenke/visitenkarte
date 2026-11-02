@@ -20,6 +20,9 @@ data class VCardProperty(
     val components: List<String> get() = VCard.splitUnescaped(rawValue, ';').map(VCard::unescape)
 }
 
+/** Eine einzeln abwählbare Angabe der Visitenkarte. */
+data class ShareEntry(val key: String, val label: String, val value: String)
+
 data class ContactEntry(val label: String, val value: String)
 
 data class PostalAddress(
@@ -95,14 +98,56 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
     /**
      * vCard ohne Foto – kompakt genug für QR-Code und NFC.
      */
-    fun compactText(): String = buildString {
+    fun compactText(): String = filteredText(emptySet(), compact = true)
+
+    /**
+     * vCard-Text zum Teilen. Zeilen, deren [ShareEntry.key] in [excluded] steht, werden weggelassen;
+     * Name und Strukturzeilen bleiben immer erhalten. [compact] entfernt zusätzlich Bilder.
+     */
+    fun filteredText(excluded: Set<String>, compact: Boolean = false): String = buildString {
         for (line in unfold(raw)) {
-            val name = propertyName(line)
-            if (name == "PHOTO" || name == "LOGO" || name == "SOUND" || name == "KEY") continue
             if (line.isBlank()) continue
+            val prop = parseLine(line)
+            if (prop != null) {
+                if (compact && prop.name in BINARY_PROPERTIES) continue
+                if (prop.name !in MANDATORY_PROPERTIES && entryKey(prop) in excluded) continue
+            }
             append(line).append("\r\n")
         }
     }
+
+    /** Alle Angaben, die man beim Teilen weglassen kann. */
+    fun shareableEntries(): List<ShareEntry> = properties
+        .filter { it.name !in MANDATORY_PROPERTIES }
+        .map { p -> ShareEntry(entryKey(p), entryLabel(p), entryValue(p)) }
+
+    private fun entryLabel(p: VCardProperty): String = when (p.name) {
+        "TEL" -> "Telefon " + labelFor(p, phone = true)
+        "EMAIL" -> "E-Mail " + labelFor(p)
+        "URL" -> labelFor(p, fallback = "Web").let { if (it == "Web") it else "Web $it" }
+        "ADR" -> "Adresse " + labelFor(p, fallback = "")
+        "BDAY" -> "Geburtstag"
+        "NOTE" -> "Notiz"
+        "ORG" -> "Firma"
+        "TITLE" -> "Titel"
+        "ROLE" -> "Rolle"
+        "NICKNAME" -> "Spitzname"
+        "PHOTO" -> "Foto"
+        "LOGO" -> "Logo"
+        "CATEGORIES" -> "Kategorien"
+        "IMPP" -> "Messenger " + (customType(p) ?: "")
+        "GEO" -> "Standort"
+        else -> p.name.lowercase().replaceFirstChar { it.uppercase() }
+    }.trim()
+
+    private fun entryValue(p: VCardProperty): String = when (p.name) {
+        "ADR", "ORG", "N" -> p.components.filter { it.isNotBlank() }.joinToString(", ")
+        "PHOTO", "LOGO", "SOUND", "KEY" -> "Bild/Datei"
+        "BDAY" -> birthdayFormatted ?: p.value
+        "TEL" -> cleanUri(p.value, "tel:")
+        "EMAIL" -> cleanUri(p.value, "mailto:")
+        else -> p.value
+    }.replace('\n', ' ').let { if (it.length > 80) it.take(77) + "…" else it }
 
     private fun labelFor(p: VCardProperty, phone: Boolean = false, fallback: String? = null): String {
         val t = p.types
@@ -144,6 +189,14 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
     val nickname: String? get() = first("NICKNAME")?.value?.ifBlank { null }
 
     companion object {
+        /** Werden nie weggelassen. */
+        private val MANDATORY_PROPERTIES = setOf("N", "FN", "PRODID", "UID", "REV", "KIND")
+        private val BINARY_PROPERTIES = setOf("PHOTO", "LOGO", "SOUND", "KEY")
+
+        /** Stabiler Schlüssel einer Zeile (Name + Wert), damit die Auswahl Aktualisierungen übersteht. */
+        internal fun entryKey(p: VCardProperty): String =
+            p.name + ":" + Integer.toHexString((p.name + "|" + p.rawValue.trim()).hashCode())
+
         fun parse(text: String): VCard {
             val props = unfold(text).mapNotNull(::parseLine)
             return VCard(text, props)
@@ -167,11 +220,6 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
                 }
             }
             return result
-        }
-
-        private fun propertyName(line: String): String {
-            val head = line.substringBefore(':').substringBefore(';')
-            return head.substringAfterLast('.').uppercase()
         }
 
         private fun parseLine(line: String): VCardProperty? {
