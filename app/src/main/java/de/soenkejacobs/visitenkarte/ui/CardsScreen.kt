@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -165,20 +167,38 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp),
+            .heightIn(min = 220.dp),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
-        Box(
+        Column(
             Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(min = 220.dp)
                 .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.75f).compositeOver(Color.Black))))
                 .padding(20.dp),
         ) {
-            if (logo != null) {
-                Image(logo, null, Modifier.align(Alignment.TopEnd).size(56.dp), contentScale = ContentScale.Fit)
+            // Oben: Kartentitel links, Logo rechts (bis 168 dp, Seitenverhältnis bleibt erhalten)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Text(
+                    card.title.uppercase(),
+                    color = onBase.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (logo != null) {
+                    val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
+                    val logoModifier = if (ratio >= 1f) {
+                        Modifier.width(LOGO_SIZE).aspectRatio(ratio)
+                    } else {
+                        Modifier.height(LOGO_SIZE).aspectRatio(ratio)
+                    }
+                    Image(logo, "Logo", logoModifier, contentScale = ContentScale.Fit)
+                }
             }
-            Row(Modifier.align(Alignment.BottomStart), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
+            // Unten: Foto und Name
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (photo != null) {
                     Image(
                         photo, null,
@@ -194,15 +214,11 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                     v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium) }
                 }
             }
-            Text(
-                card.title.uppercase(),
-                color = onBase.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
         }
     }
 }
+
+private val LOGO_SIZE = 168.dp
 
 private fun Color.compositeOver(background: Color): Color {
     val a = alpha
