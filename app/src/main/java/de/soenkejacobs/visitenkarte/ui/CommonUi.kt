@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,17 @@ import de.soenkejacobs.visitenkarte.data.ShareEntry
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
+
+/**
+ * Pager für die Karten. Startet immer bei [page] (der in der App gemerkten aktiven Karte) und
+ * stellt bewusst keinen eigenen gespeicherten Stand wieder her – sonst würde nach dem Drehen
+ * ein veralteter Stand die gerade angezeigte Karte überschreiben.
+ */
+@Composable
+fun rememberCardPager(page: Int, count: Int): PagerState {
+    val currentCount by rememberUpdatedState(count)
+    return remember { PagerState(currentPage = page.coerceIn(0, (count - 1).coerceAtLeast(0))) { currentCount } }
+}
 
 /** Ab diesem Alter gilt der lokale Stand als veraltet. */
 private val STALE_AFTER_MS = TimeUnit.DAYS.toMillis(30)

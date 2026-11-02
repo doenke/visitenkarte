@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -76,7 +75,7 @@ fun FullscreenCards(cards: List<CardItem>, page: Int, onPageChanged: (Int) -> Un
         }
     }
 
-    val pager = rememberPagerState(initialPage = page.coerceIn(0, cards.lastIndex)) { cards.size }
+    val pager = rememberCardPager(page, cards.size)
     LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
 
     Box(Modifier.fillMaxSize()) {

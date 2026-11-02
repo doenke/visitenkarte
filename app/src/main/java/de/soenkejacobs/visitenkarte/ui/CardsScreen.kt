@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,7 +104,7 @@ fun CardsScreen(
             )
             return@PullToRefreshBox
         }
-        val pager = rememberPagerState(initialPage = page.coerceIn(0, content.cards.lastIndex)) { content.cards.size }
+        val pager = rememberCardPager(page, content.cards.size)
         LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
         Column(Modifier.fillMaxSize()) {
