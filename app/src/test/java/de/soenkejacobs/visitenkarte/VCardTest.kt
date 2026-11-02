@@ -58,4 +58,28 @@ class VCardTest {
         assertEquals("Geschäftlich", v.phones.single().label)
         assertEquals("a@b.de", v.emails.single().value)
     }
+
+    @Test
+    fun exampleCardsFromServerFolder() {
+        val priv = VCard.parse(java.io.File("../server-beispiel/privat.vcf").readText())
+        assertEquals("12.04.1985", priv.birthdayFormatted)
+        assertEquals("Sönke", priv.nickname)
+        assertEquals(listOf("Mobil privat", "Privat"), priv.phones.map { it.label })
+        assertEquals(listOf("Privat", "Familie"), priv.emails.map { it.label })
+        assertEquals(listOf("Privat", "Mastodon", "Instagram"), priv.urls.map { it.label })
+        assertEquals(listOf("Musterweg 12", "22085 Hamburg", "Deutschland"), priv.addresses.single().lines)
+
+        val biz = VCard.parse(java.io.File("../server-beispiel/geschaeftlich.vcf").readText())
+        assertEquals(listOf("Geschäftlich", "Mobil geschäftlich", "Fax Geschäftlich"), biz.phones.map { it.label })
+        assertEquals(listOf("Geschäftlich", "LinkedIn", "Termin"), biz.urls.map { it.label })
+        assertEquals(listOf("3. OG", "Musterstraße 1", "20095 Hamburg", "Deutschland"), biz.addresses.single().lines)
+        assertEquals("Firma GmbH · Beratung & Entwicklung", biz.organization)
+        // Kompakt genug für einen gut scanbaren QR-Code
+        assertTrue(priv.compactText().length < 1000 && biz.compactText().length < 1000)
+    }
+
+    @Test
+    fun birthdayWithoutYear() {
+        assertEquals("24.12.", VCard.parse("BEGIN:VCARD\nBDAY:--1224\nEND:VCARD").birthdayFormatted)
+    }
 }

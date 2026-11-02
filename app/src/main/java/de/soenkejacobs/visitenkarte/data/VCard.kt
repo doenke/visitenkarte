@@ -102,8 +102,29 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
             phone && "cell" in t && "home" in t -> "Mobil privat"
             else -> base
         }
-        return label ?: fallback ?: if (phone) "Telefon" else "E-Mail"
+        return label ?: customType(p) ?: fallback ?: if (phone) "Telefon" else "E-Mail"
     }
+
+    /** Eigene Bezeichnung aus TYPE=…, z. B. `URL;TYPE=LinkedIn` → „LinkedIn“. */
+    private fun customType(p: VCardProperty): String? {
+        val generic = setOf("voice", "internet", "pref", "x400", "msg", "text", "uri", "other", "x-other", "main")
+        val raw = (p.params["TYPE"].orEmpty().flatMap { it.split(',') } + p.params[""].orEmpty()).map { it.trim() }
+        val t = raw.firstOrNull { it.isNotBlank() && it.lowercase() !in generic && !it.startsWith("pref=", true) } ?: return null
+        return t.removePrefix("x-").removePrefix("X-").replaceFirstChar { it.uppercase() }
+    }
+
+    /** Geburtstag als „TT.MM.JJJJ“ (bzw. „TT.MM.“ ohne Jahr), sonst Originalwert. */
+    val birthdayFormatted: String?
+        get() {
+            val b = birthday?.substringBefore('T') ?: return null
+            val full = Regex("^(\\d{4})-?(\\d{2})-?(\\d{2})$").find(b)
+            if (full != null) { val (y, m, d) = full.destructured; return "$d.$m.$y" }
+            val noYear = Regex("^--(\\d{2})-?(\\d{2})$").find(b)
+            if (noYear != null) { val (m, d) = noYear.destructured; return "$d.$m." }
+            return b
+        }
+
+    val nickname: String? get() = first("NICKNAME")?.value?.ifBlank { null }
 
     companion object {
         fun parse(text: String): VCard {

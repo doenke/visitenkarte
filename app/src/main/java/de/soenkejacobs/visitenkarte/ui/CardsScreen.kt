@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Nfc
@@ -45,6 +48,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -78,6 +82,8 @@ fun CardsScreen(
     onSetup: () -> Unit,
     onQr: (CardItem) -> Unit,
     onNfc: (CardItem) -> Unit,
+    page: Int = 0,
+    onPageChanged: (Int) -> Unit = {},
 ) {
     PullToRefreshBox(isRefreshing = sync is SyncState.Running, onRefresh = onSync, modifier = modifier.fillMaxSize()) {
         if (content.cards.isEmpty()) {
@@ -89,7 +95,8 @@ fun CardsScreen(
             )
             return@PullToRefreshBox
         }
-        val pager = rememberPagerState { content.cards.size }
+        val pager = rememberPagerState(initialPage = page.coerceIn(0, content.cards.lastIndex)) { content.cards.size }
+        LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
         Column(Modifier.fillMaxSize()) {
             if (content.cards.size > 1) {
@@ -140,12 +147,12 @@ fun EmptyState(text: String, action: String? = null, onAction: () -> Unit = {}) 
 }
 
 @Composable
-private fun rememberImage(file: File?): ImageBitmap? = remember(file, file?.lastModified()) {
+internal fun rememberImage(file: File?): ImageBitmap? = remember(file, file?.lastModified()) {
     file?.let { runCatching { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }.getOrNull() }
 }
 
 @Composable
-private fun rememberPhoto(card: CardItem): ImageBitmap? {
+internal fun rememberPhoto(card: CardItem): ImageBitmap? {
     val fromFile = rememberImage(card.photoFile)
     val inline = remember(card.vcard) {
         card.vcard.photoBytes?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
@@ -164,20 +171,38 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp),
+            .heightIn(min = 220.dp),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
-        Box(
+        Column(
             Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(min = 220.dp)
                 .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.75f).compositeOver(Color.Black))))
                 .padding(20.dp),
         ) {
-            if (logo != null) {
-                Image(logo, null, Modifier.align(Alignment.TopEnd).size(56.dp), contentScale = ContentScale.Fit)
+            // Oben: Kartentitel links, Logo rechts (bis 168 dp, Seitenverhältnis bleibt erhalten)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Text(
+                    card.title.uppercase(),
+                    color = onBase.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (logo != null) {
+                    val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
+                    val logoModifier = if (ratio >= 1f) {
+                        Modifier.width(LOGO_SIZE).aspectRatio(ratio)
+                    } else {
+                        Modifier.height(LOGO_SIZE).aspectRatio(ratio)
+                    }
+                    Image(logo, "Logo", logoModifier, contentScale = ContentScale.Fit)
+                }
             }
-            Row(Modifier.align(Alignment.BottomStart), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
+            // Unten: Foto und Name
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (photo != null) {
                     Image(
                         photo, null,
@@ -188,21 +213,18 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                 }
                 Column {
                     Text(v.formattedName, color = onBase, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                    v.nickname?.let { Text("„$it“", color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium) }
                     v.title?.let { Text(it, color = onBase.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyLarge) }
                     v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium) }
                 }
             }
-            Text(
-                card.title.uppercase(),
-                color = onBase.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
         }
     }
 }
 
-private fun Color.compositeOver(background: Color): Color {
+private val LOGO_SIZE = 168.dp
+
+internal fun Color.compositeOver(background: Color): Color {
     val a = alpha
     return Color(
         red = red * a + background.red * (1 - a),
@@ -259,6 +281,7 @@ private fun ContactDetails(card: CardItem) {
             v.addresses.forEach {
                 DetailRow(Icons.Default.Place, it.label, it.lines.joinToString("\n")) { open("geo:0,0?q=${Uri.encode(it.singleLine)}") }
             }
+            v.birthdayFormatted?.let { DetailRow(Icons.Default.Cake, "Geburtstag", it) {} }
             v.note?.let {
                 Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
             }
