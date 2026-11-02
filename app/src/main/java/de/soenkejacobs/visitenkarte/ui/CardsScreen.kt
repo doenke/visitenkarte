@@ -48,6 +48,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -81,6 +82,8 @@ fun CardsScreen(
     onSetup: () -> Unit,
     onQr: (CardItem) -> Unit,
     onNfc: (CardItem) -> Unit,
+    page: Int = 0,
+    onPageChanged: (Int) -> Unit = {},
 ) {
     PullToRefreshBox(isRefreshing = sync is SyncState.Running, onRefresh = onSync, modifier = modifier.fillMaxSize()) {
         if (content.cards.isEmpty()) {
@@ -92,7 +95,8 @@ fun CardsScreen(
             )
             return@PullToRefreshBox
         }
-        val pager = rememberPagerState { content.cards.size }
+        val pager = rememberPagerState(initialPage = page.coerceIn(0, content.cards.lastIndex)) { content.cards.size }
+        LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
         Column(Modifier.fillMaxSize()) {
             if (content.cards.size > 1) {
@@ -143,12 +147,12 @@ fun EmptyState(text: String, action: String? = null, onAction: () -> Unit = {}) 
 }
 
 @Composable
-private fun rememberImage(file: File?): ImageBitmap? = remember(file, file?.lastModified()) {
+internal fun rememberImage(file: File?): ImageBitmap? = remember(file, file?.lastModified()) {
     file?.let { runCatching { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }.getOrNull() }
 }
 
 @Composable
-private fun rememberPhoto(card: CardItem): ImageBitmap? {
+internal fun rememberPhoto(card: CardItem): ImageBitmap? {
     val fromFile = rememberImage(card.photoFile)
     val inline = remember(card.vcard) {
         card.vcard.photoBytes?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
@@ -220,7 +224,7 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
 
 private val LOGO_SIZE = 168.dp
 
-private fun Color.compositeOver(background: Color): Color {
+internal fun Color.compositeOver(background: Color): Color {
     val a = alpha
     return Color(
         red = red * a + background.red * (1 - a),

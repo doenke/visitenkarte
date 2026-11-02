@@ -1,5 +1,6 @@
 package de.soenkejacobs.visitenkarte.ui
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -19,10 +20,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +55,8 @@ private fun App(vm: MainViewModel) {
     val sync by vm.sync.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(if (vm.config().isConfigured) Tab.CARDS else Tab.SETTINGS) }
     var overlayKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var cardPage by rememberSaveable { mutableIntStateOf(0) }
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val overlay: Overlay? = overlayKey?.let { key ->
         val (type, id) = key.split(':', limit = 2)
         when (type) {
@@ -69,6 +74,12 @@ private fun App(vm: MainViewModel) {
             is Overlay.Nfc -> content.cards.firstOrNull { it.id == overlay.cardId }?.let { NfcScreen(it, close) } ?: LaunchedEffect(Unit) { close() }
             is Overlay.Doc -> content.documents.firstOrNull { it.id == overlay.docId }?.let { DocumentViewer(it, close) } ?: LaunchedEffect(Unit) { close() }
         }
+        return
+    }
+
+    // Querformat auf dem Karten-Tab: aktuelle Karte im Vollbild mit QR-Code
+    if (landscape && tab == Tab.CARDS && content.cards.isNotEmpty()) {
+        FullscreenCards(content.cards, cardPage) { cardPage = it }
         return
     }
 
@@ -105,6 +116,8 @@ private fun App(vm: MainViewModel) {
                 onSetup = { tab = Tab.SETTINGS },
                 onQr = { overlayKey = "qr:${it.id}" },
                 onNfc = { overlayKey = "nfc:${it.id}" },
+                page = cardPage,
+                onPageChanged = { cardPage = it },
             )
             Tab.DOCS -> DocumentsScreen(
                 modifier = modifier,
