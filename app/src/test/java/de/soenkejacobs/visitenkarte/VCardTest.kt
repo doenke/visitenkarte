@@ -74,6 +74,11 @@ class VCardTest {
         assertEquals(listOf("Geschäftlich", "LinkedIn", "Termin"), biz.urls.map { it.label })
         assertEquals(listOf("3. OG", "Musterstraße 1", "20095 Hamburg", "Deutschland"), biz.addresses.single().lines)
         assertEquals("Firma GmbH · Beratung & Entwicklung", biz.organization)
+        biz.addresses.single().let {
+            assertEquals(listOf("3. OG", "Musterstraße 1"), it.streetLines)
+            assertEquals("20095 Hamburg", it.cityLine)
+            assertTrue(it.isDomestic)
+        }
         // Kompakt genug für einen gut scanbaren QR-Code
         assertTrue(priv.compactText().length < 1000 && biz.compactText().length < 1000)
     }

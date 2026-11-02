@@ -22,8 +22,19 @@ data class VCardProperty(
 
 data class ContactEntry(val label: String, val value: String)
 
-data class PostalAddress(val label: String, val lines: List<String>) {
+data class PostalAddress(
+    val label: String,
+    val lines: List<String>,
+    /** Postfach, Adresszusatz und Straße. */
+    val streetLines: List<String> = emptyList(),
+    /** „PLZ Ort“ (ggf. mit Region). */
+    val cityLine: String = "",
+    val country: String = "",
+) {
     val singleLine: String get() = lines.joinToString(", ")
+
+    /** Land weglassen, wenn es Deutschland ist. */
+    val isDomestic: Boolean get() = country.isBlank() || country.equals("Deutschland", true) || country.equals("Germany", true)
 }
 
 /**
@@ -57,7 +68,13 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
             val c = p.components + List(7) { "" }
             val cityLine = listOf(c[5], c[3]).filter { it.isNotBlank() }.joinToString(" ")
             val lines = listOf(c[0], c[1], c[2], cityLine, c[4], c[6]).filter { it.isNotBlank() }
-            PostalAddress(labelFor(p, fallback = "Adresse"), lines)
+            PostalAddress(
+                label = labelFor(p, fallback = "Adresse"),
+                lines = lines,
+                streetLines = listOf(c[0], c[1], c[2]).filter { it.isNotBlank() },
+                cityLine = listOf(cityLine, c[4]).filter { it.isNotBlank() }.joinToString(", "),
+                country = c[6],
+            )
         }.filter { it.lines.isNotEmpty() }
 
     /** Inline-Foto (Base64 oder data:-URI), falls vorhanden. */
