@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Nfc
@@ -188,6 +189,7 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                 }
                 Column {
                     Text(v.formattedName, color = onBase, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                    v.nickname?.let { Text("„$it“", color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium) }
                     v.title?.let { Text(it, color = onBase.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyLarge) }
                     v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium) }
                 }
@@ -259,6 +261,7 @@ private fun ContactDetails(card: CardItem) {
             v.addresses.forEach {
                 DetailRow(Icons.Default.Place, it.label, it.lines.joinToString("\n")) { open("geo:0,0?q=${Uri.encode(it.singleLine)}") }
             }
+            v.birthdayFormatted?.let { DetailRow(Icons.Default.Cake, "Geburtstag", it) {} }
             v.note?.let {
                 Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
             }

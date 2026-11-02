@@ -2,7 +2,17 @@ BEGIN:VCARD
 VERSION:3.0
 N:Jacobs;Sönke;;;
 FN:Sönke Jacobs
-TEL;TYPE=CELL,HOME:+49 171 0000000
-EMAIL;TYPE=INTERNET,HOME:soenke@soenkejacobs.de
-URL:https://soenkejacobs.de
+NICKNAME:Sönke
+BDAY:1985-04-12
+TEL;TYPE=CELL,HOME,PREF:+49 171 1234567
+TEL;TYPE=HOME,VOICE:+49 40 9876543
+EMAIL;TYPE=INTERNET,HOME,PREF:soenke@soenkejacobs.de
+EMAIL;TYPE=INTERNET,Familie:familie.jacobs@example.org
+ADR;TYPE=HOME:;;Musterweg 12;Hamburg;;22085;Deutschland
+URL;TYPE=HOME:https://soenkejacobs.de
+URL;TYPE=Mastodon:https://mastodon.social/@soenke
+URL;TYPE=Instagram:https://instagram.com/soenke.jacobs
+IMPP;TYPE=Signal:sgnl://signal.me/#p/+491711234567
+CATEGORIES:Privat,Freunde
+NOTE:Am besten per Signal oder Mobil erreichbar.\nFür Notfälle: siehe Notfallkontakte in der App.
 END:VCARD
