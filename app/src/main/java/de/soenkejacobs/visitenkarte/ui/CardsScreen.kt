@@ -74,6 +74,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.soenkejacobs.visitenkarte.data.CardItem
+import de.soenkejacobs.visitenkarte.data.ShareEntry
+import de.soenkejacobs.visitenkarte.data.ShareFilter
+import de.soenkejacobs.visitenkarte.data.displayEntries
 import de.soenkejacobs.visitenkarte.data.ContentState
 import de.soenkejacobs.visitenkarte.data.SyncState
 import de.soenkejacobs.visitenkarte.share.ShareHelper
@@ -104,6 +107,8 @@ fun CardsScreen(
             )
             return@PullToRefreshBox
         }
+        val displayFilter = LocalContext.current.app.displayFilter
+        val hidden by displayFilter.excluded.collectAsStateWithLifecycle()
         val pager = rememberCardPager(page, content.cards.size)
         LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
@@ -122,6 +127,8 @@ fun CardsScreen(
             }
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 val card = content.cards[page]
+                // Für die Anzeige ausgeblendete Angaben entfernen; Teilen nutzt weiter die vollständige Karte
+                val shown = remember(card, hidden[card.id]) { displayFilter.displayed(card) }
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -129,10 +136,11 @@ fun CardsScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    BusinessCard(card)
+                    BusinessCard(shown)
+                    DisplayScope(card)
                     ShareActions(card, onQr = { onQr(card) }, onNfc = { onNfc(card) })
                     ShareScope(card)
-                    ContactDetails(card)
+                    ContactDetails(shown)
                 }
             }
         }
@@ -263,23 +271,54 @@ private fun ShareActions(card: CardItem, onQr: () -> Unit, onNfc: () -> Unit) {
 /** Zeigt, was geteilt wird, und öffnet die Auswahl. */
 @Composable
 private fun ShareScope(card: CardItem) {
-    val filter = LocalContext.current.app.shareFilter
+    FieldScope(
+        card = card,
+        filter = LocalContext.current.app.shareFilter,
+        entries = remember(card.vcard) { card.vcard.shareableEntries() },
+        allText = "Alle Angaben werden geteilt",
+        omittedPrefix = "Geteilt ohne: ",
+        icon = { Icons.Default.Share },
+        dialogTitle = "Was wird geteilt?",
+        dialogHint = "Gilt für QR-Code, NFC, Teilen, Quick Share und Widget. Name ist immer enthalten.",
+    )
+}
+
+/** Zeigt, was auf der Karte angezeigt wird, und öffnet die Auswahl. */
+@Composable
+private fun DisplayScope(card: CardItem) {
+    FieldScope(
+        card = card,
+        filter = LocalContext.current.app.displayFilter,
+        entries = remember(card) { card.displayEntries() },
+        allText = "Alle Angaben werden angezeigt",
+        omittedPrefix = "Ausgeblendet: ",
+        icon = { omitted -> if (omitted) Icons.Default.VisibilityOff else Icons.Default.Visibility },
+        dialogTitle = "Was wird angezeigt?",
+        dialogHint = "Gilt für die Karte und die Kontaktdetails in der App sowie das Vollbild im Querformat. " +
+            "Was geteilt wird, stellst du separat ein. Name ist immer sichtbar.",
+    )
+}
+
+@Composable
+private fun FieldScope(
+    card: CardItem,
+    filter: ShareFilter,
+    entries: List<ShareEntry>,
+    allText: String,
+    omittedPrefix: String,
+    icon: (Boolean) -> ImageVector,
+    dialogTitle: String,
+    dialogHint: String,
+) {
     val all by filter.excluded.collectAsStateWithLifecycle()
-    val entries = remember(card.vcard) { card.vcard.shareableEntries() }
     val excluded = all[card.id].orEmpty()
     val omitted = entries.filter { it.key in excluded }
     var showDialog by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (omitted.isEmpty()) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-            null,
-            Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Icon(icon(omitted.isNotEmpty()), null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Text(
-            if (omitted.isEmpty()) "Alle Angaben werden geteilt"
-            else "Ohne: " + omitted.joinToString(", ") { it.label },
+            if (omitted.isEmpty()) allText else omittedPrefix + omitted.joinToString(", ") { it.label },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
@@ -294,6 +333,8 @@ private fun ShareScope(card: CardItem) {
             excluded = excluded,
             onDismiss = { showDialog = false },
             onSave = { filter.setExcluded(card.id, it); showDialog = false },
+            title = dialogTitle,
+            hint = dialogHint,
         )
     }
 }

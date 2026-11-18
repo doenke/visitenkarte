@@ -82,17 +82,16 @@ fun ShareSelectionDialog(
     excluded: Set<String>,
     onDismiss: () -> Unit,
     onSave: (Set<String>) -> Unit,
+    title: String = "Was wird geteilt?",
+    hint: String = "Gilt für QR-Code, NFC, Teilen, Quick Share und Widget. Name ist immer enthalten.",
 ) {
     var selection by remember { mutableStateOf(excluded.intersect(entries.map { it.key }.toSet())) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Was wird geteilt?") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "Gilt für QR-Code, NFC, Teilen, Quick Share und Widget. Name ist immer enthalten.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text(hint, style = MaterialTheme.typography.bodySmall)
                 LazyColumn {
                     items(entries, key = { it.key }) { e ->
                         val checked = e.key !in selection
