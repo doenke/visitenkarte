@@ -44,6 +44,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import de.soenkejacobs.visitenkarte.data.CardItem
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.data.QrCode
@@ -75,12 +77,17 @@ fun FullscreenCards(cards: List<CardItem>, page: Int, onPageChanged: (Int) -> Un
         }
     }
 
-    val pager = rememberCardPager(page, cards.size)
+    val displayFilter = LocalContext.current.app.displayFilter
+    val hidden by displayFilter.excluded.collectAsStateWithLifecycle()
+        val pager = rememberCardPager(page, cards.size)
     LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
 
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { index ->
-            FullscreenCard(cards[index])
+            val card = cards[index]
+            // Anzeige ohne ausgeblendete Angaben, QR-Code nach Teilen-Auswahl
+            val shown = remember(card, hidden[card.id]) { displayFilter.displayed(card) }
+            FullscreenCard(card, shown)
         }
         if (cards.size > 1) {
             Row(
@@ -109,12 +116,12 @@ private fun cardColor(card: CardItem): Color = card.color?.let { Color(it) } ?: 
 private fun onColorFor(base: Color): Color = if (base.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
 @Composable
-private fun FullscreenCard(card: CardItem) {
+private fun FullscreenCard(card: CardItem, shown: CardItem) {
     val base = cardColor(card)
     val onBase = onColorFor(base)
-    val photo = rememberPhoto(card)
-    val logo = rememberImage(card.logoFile)
-    val v = card.vcard
+    val photo = rememberPhoto(shown)
+    val logo = rememberImage(shown.logoFile)
+    val v = shown.vcard
     val filter = LocalContext.current.app.shareFilter
     val qr = remember(card) { runCatching { QrCode.render(filter.compactText(card)).asImageBitmap() }.getOrNull() }
 

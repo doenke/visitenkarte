@@ -19,6 +19,9 @@ class VisitenkarteApp : Application() {
         private set
     lateinit var shareFilter: ShareFilter
         private set
+    /** Was auf der Karte in der App angezeigt wird. */
+    lateinit var displayFilter: ShareFilter
+        private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -26,6 +29,7 @@ class VisitenkarteApp : Application() {
         super.onCreate()
         repository = Repository(this, SettingsStore(this))
         shareFilter = ShareFilter(this)
+        displayFilter = ShareFilter(this, "display_filter")
         SyncWorker.schedule(this)
 
         // Shortcuts und Widgets aktuell halten

@@ -15,6 +15,7 @@ Alle Inhalte kommen von deinem eigenen Webserver (HTTPS + Basic Auth) und werden
 | **Teilen** | Normaler Android-Teilen-Dialog mit `.vcf`-Datei (Messenger, Mail, …). |
 | **Quick Share** | Öffnet Quick Share (Google bzw. Samsung) direkt; falls nicht vorhanden, den Teilen-Dialog. |
 | **Dokumente** | PDF (eingebauter Viewer mit Zoom), HTML (offline, ohne JavaScript/Netz), Bilder, Text. Teilen und „Extern öffnen“ möglich. |
+| **Was wird angezeigt?** | Pro Karte auswählbar, welche Angaben die Karte in der App zeigt (auch Foto und Logo) – gilt für Karte, Kontaktdetails und Vollbild. Unabhängig davon, was geteilt wird. |
 | **Was wird geteilt?** | Pro Karte abwählbar (z. B. Privatadresse, Geburtstag). Gilt für QR-Code, NFC, Teilen, Quick Share, Vollbild und Widget – die eigene Anzeige zeigt weiter alles. |
 | **Shortcuts** | Lange auf das App-Icon tippen: „QR Geschäftlich“, „QR Privat“, „NFC …“ öffnen direkt die passende Ansicht. |
 | **Widget** | QR-Code einer Karte auf dem Startbildschirm. Tippen auf den Titel wechselt die Karte, Tippen auf den Code öffnet die App. |
