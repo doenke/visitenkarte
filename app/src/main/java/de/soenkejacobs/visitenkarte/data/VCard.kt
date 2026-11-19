@@ -8,6 +8,8 @@ data class VCardProperty(
     val name: String,
     val params: Map<String, List<String>>,
     val rawValue: String,
+    /** vCard-Gruppe, z. B. `item1` in `item1.EMAIL:…` (Apple nutzt das für eigene Bezeichnungen). */
+    val group: String? = null,
 ) {
     val types: List<String>
         get() = params["TYPE"].orEmpty().flatMap { it.split(',') }.map { it.trim().lowercase() } +
@@ -80,6 +82,9 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
             )
         }.filter { it.lines.isNotEmpty() }
 
+    /** Schlüssel des eingebetteten Fotos (für die Anzeige-Auswahl). */
+    val inlinePhotoKey: String? get() = first("PHOTO")?.let { entryKey(it) }
+
     /** Inline-Foto (Base64 oder data:-URI), falls vorhanden. */
     val photoBytes: ByteArray?
         get() {
@@ -111,14 +116,20 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
             if (prop != null) {
                 if (compact && prop.name in BINARY_PROPERTIES) continue
                 if (prop.name !in MANDATORY_PROPERTIES && entryKey(prop) in excluded) continue
+                // Zugehörige Zeilen derselben Gruppe (z. B. X-ABLabel) mit weglassen
+                if (prop.group != null && prop.group in excludedGroups(excluded)) continue
             }
             append(line).append("\r\n")
         }
     }
 
+    private fun excludedGroups(excluded: Set<String>): Set<String> =
+        properties.filter { it.group != null && it.name !in TECHNICAL_PROPERTIES && entryKey(it) in excluded }
+            .mapNotNull { it.group }.toSet()
+
     /** Alle Angaben, die man beim Teilen weglassen kann. */
     fun shareableEntries(): List<ShareEntry> = properties
-        .filter { it.name !in MANDATORY_PROPERTIES }
+        .filter { it.name !in MANDATORY_PROPERTIES && it.name !in TECHNICAL_PROPERTIES }
         .map { p -> ShareEntry(entryKey(p), entryLabel(p), entryValue(p)) }
 
     private fun entryLabel(p: VCardProperty): String = when (p.name) {
@@ -149,7 +160,8 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
         else -> p.value
     }.replace('\n', ' ').let { if (it.length > 80) it.take(77) + "…" else it }
 
-    private fun labelFor(p: VCardProperty, phone: Boolean = false, fallback: String? = null): String {
+    internal fun labelFor(p: VCardProperty, phone: Boolean = false, fallback: String? = null): String {
+        groupLabel(p)?.let { return it }
         val t = p.types
         val base = when {
             "cell" in t || "mobile" in t -> "Mobil"
@@ -167,8 +179,15 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
         return label ?: customType(p) ?: fallback ?: if (phone) "Telefon" else "E-Mail"
     }
 
+    /** Bezeichnung aus `itemN.X-ABLabel` (Apple-Adressbuch), falls vorhanden. */
+    internal fun groupLabel(p: VCardProperty): String? {
+        val g = p.group ?: return null
+        val raw = properties.firstOrNull { it.group == g && it.name == "X-ABLABEL" }?.value?.trim() ?: return null
+        return appleLabel(raw).ifBlank { null }
+    }
+
     /** Eigene Bezeichnung aus TYPE=…, z. B. `URL;TYPE=LinkedIn` → „LinkedIn“. */
-    private fun customType(p: VCardProperty): String? {
+    internal fun customType(p: VCardProperty): String? {
         val generic = setOf("voice", "internet", "pref", "x400", "msg", "text", "uri", "other", "x-other", "main")
         val raw = (p.params["TYPE"].orEmpty().flatMap { it.split(',') } + p.params[""].orEmpty()).map { it.trim() }
         val t = raw.firstOrNull { it.isNotBlank() && it.lowercase() !in generic && !it.startsWith("pref=", true) } ?: return null
@@ -176,15 +195,7 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
     }
 
     /** Geburtstag als „TT.MM.JJJJ“ (bzw. „TT.MM.“ ohne Jahr), sonst Originalwert. */
-    val birthdayFormatted: String?
-        get() {
-            val b = birthday?.substringBefore('T') ?: return null
-            val full = Regex("^(\\d{4})-?(\\d{2})-?(\\d{2})$").find(b)
-            if (full != null) { val (y, m, d) = full.destructured; return "$d.$m.$y" }
-            val noYear = Regex("^--(\\d{2})-?(\\d{2})$").find(b)
-            if (noYear != null) { val (m, d) = noYear.destructured; return "$d.$m." }
-            return b
-        }
+    val birthdayFormatted: String? get() = birthday?.let(::formatDate)
 
     val nickname: String? get() = first("NICKNAME")?.value?.ifBlank { null }
 
@@ -192,6 +203,43 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
         /** Werden nie weggelassen. */
         private val MANDATORY_PROPERTIES = setOf("N", "FN", "PRODID", "UID", "REV", "KIND")
         private val BINARY_PROPERTIES = setOf("PHOTO", "LOGO", "SOUND", "KEY")
+
+        /** Interne Verwaltungszeilen – werden geteilt, aber nie angezeigt oder einzeln ausgewählt. */
+        internal val TECHNICAL_PROPERTIES = setOf(
+            "X-ABLABEL", "X-ABADR", "X-ABUID", "X-ABSHOWAS", "X-ABPERSON",
+            "PRODID", "REV", "UID", "KIND", "SOURCE", "CLIENTPIDMAP", "XML", "NAME", "PROFILE", "MAILER", "CLASS", "SORT-STRING",
+        )
+
+        /** Datum als „TT.MM.JJJJ“ (bzw. „TT.MM.“ ohne Jahr), sonst Originalwert. */
+        fun formatDate(raw: String): String {
+            val b = raw.trim().substringBefore('T')
+            val full = Regex("^(\\d{4})-?(\\d{2})-?(\\d{2})$").find(b)
+            if (full != null) { val (y, m, d) = full.destructured; return "$d.$m.$y" }
+            val noYear = Regex("^--(\\d{2})-?(\\d{2})$").find(b)
+            if (noYear != null) { val (m, d) = noYear.destructured; return "$d.$m." }
+            return raw
+        }
+
+        /** Apple-Standardbezeichnungen wie `_$!<HomePage>!$_` übersetzen. */
+        internal fun appleLabel(raw: String): String {
+            if (!raw.startsWith("_\$!<") || !raw.endsWith(">!\$_")) return raw
+            val inner = raw.removePrefix("_\$!<").removeSuffix(">!\$_")
+            return when (inner.lowercase()) {
+                "home" -> "Privat"
+                "work" -> "Geschäftlich"
+                "mobile" -> "Mobil"
+                "main" -> "Hauptnummer"
+                "homepage" -> "Website"
+                "homefax" -> "Fax privat"
+                "workfax" -> "Fax geschäftlich"
+                "pager" -> "Pager"
+                "other" -> "Sonstige"
+                "anniversary" -> "Jahrestag"
+                "school" -> "Schule"
+                "iphone" -> "iPhone"
+                else -> inner
+            }
+        }
 
         /** Stabiler Schlüssel einer Zeile (Name + Wert), damit die Auswahl Aktualisierungen übersteht. */
         internal fun entryKey(p: VCardProperty): String =
@@ -228,6 +276,7 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
             var value = line.substring(colon + 1)
             val parts = splitUnescaped(head, ';', respectQuotes = true)
             val name = parts.first().substringAfterLast('.').uppercase()
+            val group = parts.first().substringBeforeLast('.', "").ifBlank { null }
             if (name.isBlank() || name == "BEGIN" || name == "END" || name == "VERSION") return null
             val params = mutableMapOf<String, MutableList<String>>()
             for (p in parts.drop(1)) {
@@ -242,7 +291,7 @@ class VCard private constructor(val raw: String, val properties: List<VCardPrope
                     ?: Charsets.UTF_8
                 value = decodeQuotedPrintable(value, charset)
             }
-            return VCardProperty(name, params, value)
+            return VCardProperty(name, params, value, group)
         }
 
         private fun findValueColon(line: String): Int? {

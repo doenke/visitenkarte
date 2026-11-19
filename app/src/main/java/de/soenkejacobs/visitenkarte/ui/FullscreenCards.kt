@@ -1,5 +1,6 @@
 package de.soenkejacobs.visitenkarte.ui
 
+import androidx.compose.runtime.getValue
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
@@ -36,16 +37,16 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import de.soenkejacobs.visitenkarte.data.CardItem
+import de.soenkejacobs.visitenkarte.data.CardLayout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import de.soenkejacobs.visitenkarte.app
 import de.soenkejacobs.visitenkarte.data.QrCode
@@ -77,17 +78,17 @@ fun FullscreenCards(cards: List<CardItem>, page: Int, onPageChanged: (Int) -> Un
         }
     }
 
-    val displayFilter = LocalContext.current.app.displayFilter
-    val hidden by displayFilter.excluded.collectAsStateWithLifecycle()
+    val displaySettings = LocalContext.current.app.displaySettings
+    val placements by displaySettings.placements.collectAsStateWithLifecycle()
         val pager = rememberCardPager(page, cards.size)
     LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
 
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { index ->
             val card = cards[index]
-            // Anzeige ohne ausgeblendete Angaben, QR-Code nach Teilen-Auswahl
-            val shown = remember(card, hidden[card.id]) { displayFilter.displayed(card) }
-            FullscreenCard(card, shown)
+            // Anzeige nach Karten-Auswahl, QR-Code nach Teilen-Auswahl
+            val layout = remember(card, placements[card.id]) { CardLayout.of(card, placements[card.id].orEmpty()) }
+            FullscreenCard(card, layout)
         }
         if (cards.size > 1) {
             Row(
@@ -116,12 +117,11 @@ private fun cardColor(card: CardItem): Color = card.color?.let { Color(it) } ?: 
 private fun onColorFor(base: Color): Color = if (base.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
 @Composable
-private fun FullscreenCard(card: CardItem, shown: CardItem) {
+private fun FullscreenCard(card: CardItem, layout: CardLayout) {
     val base = cardColor(card)
     val onBase = onColorFor(base)
-    val photo = rememberPhoto(shown)
-    val logo = rememberImage(shown.logoFile)
-    val v = shown.vcard
+    val photo = rememberPhoto(card).takeIf { layout.showPhoto }
+    val logo = rememberImage(card.logoFile).takeIf { layout.showLogo }
     val filter = LocalContext.current.app.shareFilter
     val qr = remember(card) { runCatching { QrCode.render(filter.compactText(card)).asImageBitmap() }.getOrNull() }
 
@@ -134,74 +134,39 @@ private fun FullscreenCard(card: CardItem, shown: CardItem) {
     ) {
         val qrSize = min(maxHeight * 0.62f, maxWidth * 0.38f)
         val logoMax = min(168.dp, maxHeight - qrSize - 16.dp).coerceAtLeast(40.dp)
-        val photoSize = min(120.dp, maxHeight * 0.3f)
+        val photoSize = min(104.dp, maxHeight * 0.26f)
+        val leftWidth = maxWidth - qrSize - 32.dp
 
-        // Oben links: Kartentitel
-        Text(
-            card.title.uppercase(),
-            color = onBase.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.align(Alignment.TopStart),
-        )
+        // Links: Titel, Foto + Name + Kopfangaben, darunter die Themen in Spalten
+        Column(Modifier.align(Alignment.TopStart).width(leftWidth).fillMaxHeight()) {
+            Text(card.title.uppercase(), color = onBase.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (photo != null) {
+                    Image(photo, null, Modifier.size(photoSize).clip(CircleShape), contentScale = ContentScale.Crop)
+                    Spacer(Modifier.width(20.dp))
+                }
+                CardHeader(card, layout, onBase, MaterialTheme.typography.headlineLarge, MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(16.dp))
+            // Ganze Themen wandern in die nächste Spalte; was nicht passt, entfällt (nie halbe Themen)
+            val t = MaterialTheme.typography
+            GroupColumns(
+                layout.cardGroups,
+                onBase,
+                listOf(t.bodyLarge, t.bodyMedium, t.bodySmall),
+                Modifier.weight(1f).fillMaxWidth(),
+            )
+        }
 
-        // Oben rechts: Logo
+        // Rechts oben: Logo (nur über dem QR-Code, damit es die Angaben nicht überdeckt)
         if (logo != null) {
-            // In ein Feld von max. logoMax Höhe und 1,6 × QR-Breite einpassen
             val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
-            val maxW = qrSize * 1.6f
-            val w = min(logoMax * ratio, maxW)
+            val w = min(logoMax * ratio, qrSize)
             Image(logo, "Logo", Modifier.align(Alignment.TopEnd).size(w, w / ratio), contentScale = ContentScale.Fit)
         }
 
-        // Unten links: Foto, Name und wichtigste Kontaktdaten
-        Row(
-            Modifier
-                .align(Alignment.BottomStart)
-                .padding(end = qrSize + 24.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            if (photo != null) {
-                Image(
-                    photo, null,
-                    Modifier.size(photoSize).clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
-                Spacer(Modifier.width(20.dp))
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    v.formattedName,
-                    color = onBase,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                v.title?.let { Text(it, color = onBase.copy(alpha = 0.9f), style = MaterialTheme.typography.titleLarge) }
-                v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.titleMedium) }
-                Spacer(Modifier.height(10.dp))
-                val lines = listOfNotNull(
-                    v.phones.firstOrNull()?.value,
-                    v.emails.firstOrNull()?.value,
-                    v.urls.firstOrNull()?.value?.removePrefix("https://")?.removePrefix("http://"),
-                )
-                lines.forEach {
-                    Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                // Postanschrift: Straße (inkl. Zusatz) in einer Zeile, PLZ/Ort (Land nur, wenn nicht Deutschland) darunter
-                v.addresses.firstOrNull()?.let { adr ->
-                    val second = listOf(adr.cityLine, if (adr.isDomestic) "" else adr.country)
-                        .filter { it.isNotBlank() }.joinToString(", ")
-                    val addressLines = listOf(adr.streetLines.joinToString(", "), second).filter { it.isNotBlank() }
-                    if (addressLines.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                    addressLines.forEach {
-                        Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
-
-        // Unten rechts: QR-Code
+        // Rechts unten: QR-Code
         if (qr != null) {
             Box(
                 Modifier
