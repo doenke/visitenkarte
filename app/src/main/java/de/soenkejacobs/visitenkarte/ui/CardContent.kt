@@ -99,8 +99,8 @@ fun FieldKind.icon(): ImageVector = when (this) {
 
 /**
  * Ein Thema als zusammenhängender Block mit Symbol (alle Telefonnummern, alle Adressen …).
- * Bei mehreren Einträgen steht die Bezeichnung (Mobil, Privat …) klein hinter dem Wert.
- * [alignEnd]: rechtsbündig, Symbol rechts (rechte Spalte, z. B. am QR-Code).
+ * Bei mehreren Einträgen steht die Bezeichnung (Mobil, Privat …) klein auf der Innenseite:
+ * hinter dem Wert, bei [alignEnd] (rechtsbündig, Symbol rechts – z. B. am QR-Code) davor.
  */
 @Composable
 fun IconGroupBlock(
@@ -122,10 +122,15 @@ fun IconGroupBlock(
             group.items.forEachIndexed { index, item ->
                 if (index > 0 && item.lines.size > 1) Spacer(Modifier.height(4.dp))
                 item.lines.forEachIndexed { i, line ->
+                    // Bezeichnung immer nach innen: links neben dem Wert bei rechtsbündigen Blöcken
+                    val label = item.label.takeIf { showLabels && i == 0 && it.isNotBlank() }
                     val text = buildAnnotatedString {
+                        if (label != null && alignEnd) {
+                            withStyle(SpanStyle(color = labelColor, fontSize = style.fontSize * 0.78f)) { append("$label  ") }
+                        }
                         append(line)
-                        if (showLabels && i == 0 && item.label.isNotBlank()) {
-                            withStyle(SpanStyle(color = labelColor, fontSize = style.fontSize * 0.78f)) { append("  ${item.label}") }
+                        if (label != null && !alignEnd) {
+                            withStyle(SpanStyle(color = labelColor, fontSize = style.fontSize * 0.78f)) { append("  $label") }
                         }
                     }
                     Text(
