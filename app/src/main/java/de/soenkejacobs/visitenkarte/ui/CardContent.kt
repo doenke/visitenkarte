@@ -8,15 +8,12 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -39,14 +36,10 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.ViewAgenda
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,12 +62,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.soenkejacobs.visitenkarte.app
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.text.style.TextAlign
+import de.soenkejacobs.visitenkarte.data.CardSize
+import de.soenkejacobs.visitenkarte.data.DisplayOverrides
 import de.soenkejacobs.visitenkarte.data.CardItem
 import de.soenkejacobs.visitenkarte.data.DisplayChoice
 import de.soenkejacobs.visitenkarte.data.FieldGroup
 import de.soenkejacobs.visitenkarte.data.FieldItem
 import de.soenkejacobs.visitenkarte.data.FieldKind
-import de.soenkejacobs.visitenkarte.data.Placement
 import de.soenkejacobs.visitenkarte.data.displayChoices
 
 /** Symbol je Thema. */
@@ -101,97 +98,138 @@ fun FieldKind.icon(): ImageVector = when (this) {
 }
 
 /**
- * Ein Thema als zusammenhängender Block (alle Telefonnummern, alle Adressen …).
- * Bei mehreren Einträgen steht die Bezeichnung (Mobil, Privat …) klein hinter dem Wert.
+ * Ein Thema als zusammenhängender Block mit Symbol (alle Telefonnummern, alle Adressen …).
+ * Bei mehreren Einträgen steht die Bezeichnung (Mobil, Privat …) klein auf der Innenseite:
+ * hinter dem Wert, bei [alignEnd] (rechtsbündig, Symbol rechts – z. B. am QR-Code) davor.
  */
 @Composable
-fun GroupBlock(group: FieldGroup, color: Color, style: TextStyle, modifier: Modifier = Modifier) {
-    val showLabels = group.items.size > 1
-    Column(modifier) {
-        group.items.forEachIndexed { index, item ->
-            if (index > 0 && item.lines.size > 1) Spacer(Modifier.padding(top = 4.dp))
-            item.lines.forEachIndexed { i, line ->
-                val text = buildAnnotatedString {
-                    append(line)
-                    if (showLabels && i == 0 && item.label.isNotBlank()) {
-                        withStyle(SpanStyle(color = color.copy(alpha = 0.6f), fontSize = style.fontSize * 0.8f)) {
-                            append("  ${item.label}")
+fun IconGroupBlock(
+    group: FieldGroup,
+    color: Color,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    alignEnd: Boolean = false,
+) {
+    val labelColor = color.copy(alpha = 0.55f)
+    val iconSize = (style.fontSize.value * 1.15f).dp
+    val icon: @Composable () -> Unit = {
+        Icon(group.kind.icon(), null, Modifier.padding(top = 2.dp).size(iconSize), tint = color.copy(alpha = 0.7f))
+    }
+    Row(modifier, verticalAlignment = Alignment.Top) {
+        if (!alignEnd) { icon(); Spacer(Modifier.width(8.dp)) }
+        Column(horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
+            val showLabels = group.items.size > 1
+            group.items.forEachIndexed { index, item ->
+                if (index > 0 && item.lines.size > 1) Spacer(Modifier.height(4.dp))
+                item.lines.forEachIndexed { i, line ->
+                    // Bezeichnung immer nach innen: links neben dem Wert bei rechtsbündigen Blöcken
+                    val label = item.label.takeIf { showLabels && i == 0 && it.isNotBlank() }
+                    val text = buildAnnotatedString {
+                        if (label != null && alignEnd) {
+                            withStyle(SpanStyle(color = labelColor, fontSize = style.fontSize * 0.78f)) { append("$label  ") }
+                        }
+                        append(line)
+                        if (label != null && !alignEnd) {
+                            withStyle(SpanStyle(color = labelColor, fontSize = style.fontSize * 0.78f)) { append("  $label") }
                         }
                     }
+                    Text(
+                        text, color = color.copy(alpha = 0.92f), style = style,
+                        textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+                        maxLines = if (item.kind == FieldKind.NOTE) 3 else 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Text(text, color = color.copy(alpha = 0.9f), style = style, maxLines = if (item.kind == FieldKind.NOTE) 3 else 1, overflow = TextOverflow.Ellipsis)
             }
         }
-    }
-}
-
-/** Themen nebeneinander, die ganze Themen in die nächste Zeile umbrechen (Hochformat-Karte). */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun GroupFlow(groups: List<FieldGroup>, color: Color, style: TextStyle, modifier: Modifier = Modifier) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        groups.forEach { GroupBlock(it, color, style) }
+        if (alignEnd) { Spacer(Modifier.width(8.dp)); icon() }
     }
 }
 
 /**
- * Themen spaltenweise von oben nach unten (Vollbild im Querformat). Passt ein Thema nicht mehr
- * in die Spalte, beginnt es als Ganzes in der nächsten Spalte – ein Thema wird nie getrennt.
- * Passen nicht alle Themen, wird die Schrift stufenweise kleiner ([styles]); erst wenn auch die
- * kleinste Stufe nicht reicht, entfallen die letzten Themen vollständig.
+ * Raster für die Themen: so viele Spalten wie nebeneinander passen, Themen zeilenweise in
+ * Datei-Reihenfolge. Die erste Spalte ist linksbündig, die letzte rechtsbündig (bündig zum
+ * rechten Rand, z. B. am QR-Code). Innerhalb einer Zeile sind die Blöcke unten ausgerichtet.
+ * Ein Thema wird nie getrennt. Passt nicht alles in die Höhe, wird die Schrift stufenweise
+ * kleiner ([styles]); reicht auch das nicht, entfallen die letzten Zeilen vollständig.
  */
 @Composable
-fun GroupColumns(
+fun EdgeGrid(
     groups: List<FieldGroup>,
     color: Color,
     styles: List<TextStyle>,
     modifier: Modifier = Modifier,
-    gap: Dp = 12.dp,
-    columnGap: Dp = 28.dp,
-    maxColumnWidth: Dp = 360.dp,
+    columnGap: Dp = 24.dp,
+    rowGap: Dp = 12.dp,
+    maxColumns: Int = 4,
 ) {
     SubcomposeLayout(modifier) { constraints ->
         val maxW = constraints.maxWidth
         val maxH = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
-        val gapPx = gap.roundToPx()
-        val columnGapPx = columnGap.roundToPx()
+        val colGapPx = columnGap.roundToPx()
+        val rowGapPx = rowGap.roundToPx()
+        val n = groups.size
 
-        /** Packt die Blöcke spaltenweise; liefert Positionen (null = passt nicht). */
-        fun pack(placeables: List<Placeable>): List<Pair<Int, Int>?> {
-            val positions = MutableList<Pair<Int, Int>?>(placeables.size) { null }
-            var x = 0
-            var y = 0
-            var columnWidth = 0
-            for ((i, p) in placeables.withIndex()) {
-                if (y > 0 && y + p.height > maxH) {
-                    x += columnWidth + columnGapPx
-                    y = 0
-                    columnWidth = 0
-                }
-                if (x + p.width > maxW || p.height > maxH) break
-                positions[i] = x to y
-                y += p.height + gapPx
-                columnWidth = maxOf(columnWidth, p.width)
+        class Plan(val styleIndex: Int, val k: Int, val colW: IntArray, val rowH: IntArray, val rows: Int)
+
+        fun plan(styleIndex: Int, sizes: List<Placeable>): Plan {
+            var k = minOf(maxOf(n, 1), maxColumns)
+            while (k > 1) {
+                val w = IntArray(k)
+                sizes.forEachIndexed { i, p -> w[i % k] = maxOf(w[i % k], p.width) }
+                if (w.sum() + (k - 1) * colGapPx <= maxW) break
+                k--
             }
-            return positions
+            val colW = IntArray(k)
+            sizes.forEachIndexed { i, p -> colW[i % k] = maxOf(colW[i % k], minOf(p.width, maxW)) }
+            val rowsTotal = (n + k - 1) / k
+            val rowH = IntArray(rowsTotal)
+            sizes.forEachIndexed { i, p -> rowH[i / k] = maxOf(rowH[i / k], p.height) }
+            // so viele ganze Zeilen wie in die Höhe passen
+            var rows = 0
+            var h = 0
+            for (r in 0 until rowsTotal) {
+                val next = h + (if (r > 0) rowGapPx else 0) + rowH[r]
+                if (next > maxH) break
+                h = next
+                rows++
+            }
+            return Plan(styleIndex, k, colW, rowH, rows)
         }
 
-        var chosen: List<Placeable> = emptyList()
-        var positions: List<Pair<Int, Int>?> = emptyList()
+        var chosen: Plan? = null
         for ((index, style) in styles.withIndex()) {
-            val placeables = subcompose(index) {
-                groups.forEach { GroupBlock(it, color, style, Modifier.widthIn(max = maxColumnWidth)) }
-            }.map { it.measure(Constraints(maxWidth = maxW, maxHeight = maxH)) }
-            chosen = placeables
-            positions = pack(placeables)
-            if (positions.all { it != null }) break // alles passt in dieser Schriftgröße
+            val sizes = subcompose("m$index") {
+                groups.forEach { IconGroupBlock(it, color, style) }
+            }.map { it.measure(Constraints(maxWidth = maxW)) }
+            val p = plan(index, sizes)
+            chosen = p
+            if (p.rows * p.k >= n) break // alles passt in dieser Schriftgröße
         }
-        layout(maxW, if (constraints.hasBoundedHeight) constraints.maxHeight else (chosen.lastOrNull()?.height ?: 0)) {
-            chosen.forEachIndexed { i, p -> positions[i]?.let { (px, py) -> p.place(px, py) } }
+        val p = chosen ?: return@SubcomposeLayout layout(0, 0) {}
+        val style = styles[p.styleIndex]
+        val visible = minOf(n, p.rows * p.k)
+        val placeables = subcompose("final") {
+            groups.take(visible).forEachIndexed { i, g ->
+                IconGroupBlock(g, color, style, alignEnd = p.k > 1 && i % p.k == p.k - 1)
+            }
+        }.mapIndexed { i, m -> m.measure(Constraints(maxWidth = p.colW[i % p.k].coerceAtLeast(1))) }
+
+        // Spalten: erste links, letzte am rechten Rand, Zwischenraum gleichmäßig verteilt
+        val free = (maxW - p.colW.sum()).coerceAtLeast(0)
+        val gapEach = if (p.k > 1) free / (p.k - 1) else 0
+        val colX = IntArray(p.k)
+        for (c in 1 until p.k) colX[c] = colX[c - 1] + p.colW[c - 1] + gapEach
+        val rowY = IntArray(p.rows)
+        for (r in 1 until p.rows) rowY[r] = rowY[r - 1] + p.rowH[r - 1] + rowGapPx
+        val height = if (p.rows == 0) 0 else rowY[p.rows - 1] + p.rowH[p.rows - 1]
+
+        layout(maxW, height) {
+            placeables.forEachIndexed { i, pl ->
+                val c = i % p.k
+                val r = i / p.k
+                val x = if (p.k > 1 && c == p.k - 1) colX[c] + p.colW[c] - pl.width else colX[c]
+                pl.place(x, rowY[r] + p.rowH[r] - pl.height) // unten ausgerichtet
+            }
         }
     }
 }
@@ -241,23 +279,20 @@ private fun DetailItemRow(item: FieldItem, onClick: () -> Unit) {
     }
 }
 
-/** Zeile „Angezeigt: …“ mit Auswahl-Knopf. */
+/** Zeile „Kleine Karte: … · Große Karte: …“ mit Anpassen-Knopf. */
 @Composable
 fun DisplayScope(card: CardItem) {
     val settings = LocalContext.current.app.displaySettings
-    val all by settings.placements.collectAsStateWithLifecycle()
-    val placements = all[card.id].orEmpty()
+    val all by settings.overrides.collectAsStateWithLifecycle()
+    val overrides = all[card.id] ?: DisplayOverrides()
     val choices = remember(card) { card.displayChoices() }
-    val effective = choices.map { placements[it.key] ?: it.default }
-    val onCard = effective.count { it == Placement.CARD }
-    val details = effective.count { it == Placement.DETAILS }
-    val hidden = effective.count { it == Placement.HIDDEN }
+    fun count(size: CardSize) = choices.count { overrides.forSize(size)[it.key] ?: it.default(size) }
     var showDialog by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.ViewAgenda, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Text(
-            "Anzeige: $onCard auf der Karte, $details in Details" + if (hidden > 0) ", $hidden aus" else "",
+            "Kleine Karte: ${count(CardSize.SMALL)} Angaben · Große Karte: ${count(CardSize.LARGE)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
@@ -267,29 +302,30 @@ fun DisplayScope(card: CardItem) {
     if (showDialog) {
         DisplaySelectionDialog(
             choices = choices,
-            placements = placements,
+            overrides = overrides,
             onDismiss = { showDialog = false },
             onSave = { settings.set(card.id, it); showDialog = false },
         )
     }
 }
 
-/** Dialog: pro Angabe Karte / Details / Aus, nach Themen gruppiert. */
+/** Dialog: pro Angabe „Klein“ und „Groß“ an/aus, nach Themen gruppiert. */
 @Composable
 fun DisplaySelectionDialog(
     choices: List<DisplayChoice>,
-    placements: Map<String, Placement>,
+    overrides: DisplayOverrides,
     onDismiss: () -> Unit,
-    onSave: (Map<String, Placement>) -> Unit,
+    onSave: (DisplayOverrides) -> Unit,
 ) {
-    var current by remember { mutableStateOf(choices.associate { it.key to (placements[it.key] ?: it.default) }) }
+    var small by remember { mutableStateOf(choices.associate { it.key to (overrides.small[it.key] ?: it.defaultSmall) }) }
+    var large by remember { mutableStateOf(choices.associate { it.key to (overrides.large[it.key] ?: it.defaultLarge) }) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Was wird angezeigt?") },
+        title = { Text("Was steht auf den Karten?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Karte = auf der Visitenkarte und im Vollbild, Details = nur in der Liste darunter. " +
+                    "Klein = Karte im Hochformat, Groß = Vollbild im Querformat. Die Details unter der Karte zeigen immer alles. " +
                         "Themen stehen in der Reihenfolge der vCard-Datei. Was geteilt wird, stellst du separat ein.",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -300,36 +336,33 @@ fun DisplaySelectionDialog(
                                 section,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                                modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
                             )
                         }
                         items(entries, key = { it.key }) { c ->
-                            Column(Modifier.padding(vertical = 4.dp)) {
-                                Text(c.label, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    c.value,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                val options = if (c.imageOnly) listOf(Placement.CARD, Placement.HIDDEN) else Placement.entries
-                                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                                    options.forEachIndexed { i, option ->
-                                        SegmentedButton(
-                                            selected = current[c.key] == option,
-                                            onClick = { current = current + (c.key to option) },
-                                            shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                                            icon = {},
-                                        ) {
-                                            if (option == Placement.HIDDEN) {
-                                                Icon(Icons.Default.VisibilityOff, null, Modifier.size(16.dp))
-                                                Spacer(Modifier.width(4.dp))
-                                            }
-                                            Text(option.label, style = MaterialTheme.typography.labelMedium)
-                                        }
-                                    }
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(c.label, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        c.value,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
+                                FilterChip(
+                                    selected = small[c.key] == true,
+                                    onClick = { small = small + (c.key to !(small[c.key] ?: false)) },
+                                    label = { Text(CardSize.SMALL.label) },
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
+                                FilterChip(
+                                    selected = large[c.key] == true,
+                                    onClick = { large = large + (c.key to !(large[c.key] ?: false)) },
+                                    label = { Text(CardSize.LARGE.label) },
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
                             }
                         }
                     }
@@ -338,7 +371,14 @@ fun DisplaySelectionDialog(
         },
         confirmButton = {
             // Nur Abweichungen vom Standard speichern
-            TextButton(onClick = { onSave(current.filter { (k, v) -> v != choices.first { it.key == k }.default }) }) { Text("Speichern") }
+            TextButton(onClick = {
+                onSave(
+                    DisplayOverrides(
+                        small = small.filter { (k, v) -> v != choices.first { it.key == k }.defaultSmall },
+                        large = large.filter { (k, v) -> v != choices.first { it.key == k }.defaultLarge },
+                    ),
+                )
+            }) { Text("Speichern") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
     )

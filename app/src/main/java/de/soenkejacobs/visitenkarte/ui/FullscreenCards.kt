@@ -23,7 +23,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +43,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import de.soenkejacobs.visitenkarte.data.CardItem
 import de.soenkejacobs.visitenkarte.data.CardLayout
+import de.soenkejacobs.visitenkarte.data.CardSize
+import de.soenkejacobs.visitenkarte.data.DisplayOverrides
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,7 +82,8 @@ fun FullscreenCards(cards: List<CardItem>, page: Int, onPageChanged: (Int) -> Un
     }
 
     val displaySettings = LocalContext.current.app.displaySettings
-    val placements by displaySettings.placements.collectAsStateWithLifecycle()
+    val overrides by displaySettings.overrides.collectAsStateWithLifecycle()
+    val filter = LocalContext.current.app.shareFilter
         val pager = rememberCardPager(page, cards.size)
     LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
 
@@ -87,8 +91,11 @@ fun FullscreenCards(cards: List<CardItem>, page: Int, onPageChanged: (Int) -> Un
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { index ->
             val card = cards[index]
             // Anzeige nach Karten-Auswahl, QR-Code nach Teilen-Auswahl
-            val layout = remember(card, placements[card.id]) { CardLayout.of(card, placements[card.id].orEmpty()) }
-            FullscreenCard(card, layout)
+            val layout = remember(card, overrides[card.id]) {
+                CardLayout.of(card, overrides[card.id] ?: DisplayOverrides(), CardSize.LARGE)
+            }
+            val qrText = remember(card) { filter.compactText(card) }
+            FullscreenCard(card, layout, qrText)
         }
         if (cards.size > 1) {
             Row(
@@ -116,67 +123,68 @@ private fun cardColor(card: CardItem): Color = card.color?.let { Color(it) } ?: 
 
 private fun onColorFor(base: Color): Color = if (base.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
+/**
+ * Große Karte (Design „Klassisch“): oben Kartentitel, Name und Kopfangaben; unten eine feine
+ * Linie und die Themen im Raster – die rechte Spalte rechtsbündig am QR-Code. Rechts der QR-Code,
+ * darüber das Logo.
+ */
 @Composable
-private fun FullscreenCard(card: CardItem, layout: CardLayout) {
+internal fun FullscreenCard(card: CardItem, layout: CardLayout, qrText: String) {
     val base = cardColor(card)
     val onBase = onColorFor(base)
     val photo = rememberPhoto(card).takeIf { layout.showPhoto }
     val logo = rememberImage(card.logoFile).takeIf { layout.showLogo }
-    val filter = LocalContext.current.app.shareFilter
-    val qr = remember(card) { runCatching { QrCode.render(filter.compactText(card)).asImageBitmap() }.getOrNull() }
+    val qr = remember(qrText) { runCatching { QrCode.render(qrText).asImageBitmap() }.getOrNull() }
+    val t = MaterialTheme.typography
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.75f).compositeOver(Color.Black))))
             .windowInsetsPadding(WindowInsets.displayCutout)
-            .padding(24.dp),
+            .padding(28.dp),
     ) {
-        val qrSize = min(maxHeight * 0.62f, maxWidth * 0.38f)
-        val logoMax = min(168.dp, maxHeight - qrSize - 16.dp).coerceAtLeast(40.dp)
-        val photoSize = min(104.dp, maxHeight * 0.26f)
-        val leftWidth = maxWidth - qrSize - 32.dp
-
-        // Links: Titel, Foto + Name + Kopfangaben, darunter die Themen in Spalten
-        Column(Modifier.align(Alignment.TopStart).width(leftWidth).fillMaxHeight()) {
-            Text(card.title.uppercase(), color = onBase.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (photo != null) {
-                    Image(photo, null, Modifier.size(photoSize).clip(CircleShape), contentScale = ContentScale.Crop)
-                    Spacer(Modifier.width(20.dp))
+        val qrSize = min(maxHeight * 0.55f, maxWidth * 0.3f)
+        val logoMaxHeight = (maxHeight - qrSize - 16.dp).coerceAtLeast(32.dp).coerceAtMost(120.dp)
+        val photoSize = min(96.dp, maxHeight * 0.26f)
+        Row(Modifier.fillMaxSize()) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (photo != null) {
+                        Image(photo, null, Modifier.size(photoSize).clip(CircleShape), contentScale = ContentScale.Crop)
+                        Spacer(Modifier.width(20.dp))
+                    }
+                    Column {
+                        CardTitle(card.title, onBase, 11)
+                        Spacer(Modifier.height(6.dp))
+                        CardHeader(card, layout, onBase, t.headlineLarge, t.titleSmall)
+                    }
                 }
-                CardHeader(card, layout, onBase, MaterialTheme.typography.headlineLarge, MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f).heightIn(min = 12.dp))
+                if (layout.groups.isNotEmpty()) {
+                    HorizontalDivider(color = onBase.copy(alpha = 0.25f))
+                    Spacer(Modifier.height(12.dp))
+                    // Ganze Themen im Raster; die rechte Spalte schließt bündig zum QR-Code ab
+                    EdgeGrid(layout.groups, onBase, listOf(t.bodyLarge, t.bodyMedium, t.bodySmall), Modifier.fillMaxWidth(), columnGap = 28.dp)
+                }
             }
-            Spacer(Modifier.height(16.dp))
-            // Ganze Themen wandern in die nächste Spalte; was nicht passt, entfällt (nie halbe Themen)
-            val t = MaterialTheme.typography
-            GroupColumns(
-                layout.cardGroups,
-                onBase,
-                listOf(t.bodyLarge, t.bodyMedium, t.bodySmall),
-                Modifier.weight(1f).fillMaxWidth(),
-            )
-        }
-
-        // Rechts oben: Logo (nur über dem QR-Code, damit es die Angaben nicht überdeckt)
-        if (logo != null) {
-            val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
-            val w = min(logoMax * ratio, qrSize)
-            Image(logo, "Logo", Modifier.align(Alignment.TopEnd).size(w, w / ratio), contentScale = ContentScale.Fit)
-        }
-
-        // Rechts unten: QR-Code
-        if (qr != null) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(qrSize)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .padding(6.dp),
-            ) {
-                Image(qr, "QR-Code mit Visitenkarte", Modifier.fillMaxSize(), filterQuality = FilterQuality.None)
+            Spacer(Modifier.width(24.dp))
+            Column(Modifier.fillMaxHeight(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Bottom) {
+                if (logo != null) {
+                    CardLogo(logo, qrSize, logoMaxHeight)
+                    Spacer(Modifier.height(16.dp))
+                }
+                if (qr != null) {
+                    Box(
+                        Modifier
+                            .size(qrSize)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .padding(6.dp),
+                    ) {
+                        Image(qr, "QR-Code mit Visitenkarte", Modifier.fillMaxSize(), filterQuality = FilterQuality.None)
+                    }
+                }
             }
         }
     }
