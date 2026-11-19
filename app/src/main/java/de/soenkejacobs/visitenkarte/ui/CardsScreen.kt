@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -65,6 +64,11 @@ import de.soenkejacobs.visitenkarte.data.CardItem
 import de.soenkejacobs.visitenkarte.data.ShareEntry
 import de.soenkejacobs.visitenkarte.data.ShareFilter
 import de.soenkejacobs.visitenkarte.data.CardLayout
+import de.soenkejacobs.visitenkarte.data.CardSize
+import de.soenkejacobs.visitenkarte.data.DisplayOverrides
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import de.soenkejacobs.visitenkarte.data.FieldKind
 import androidx.compose.ui.text.TextStyle
 import de.soenkejacobs.visitenkarte.data.ContentState
@@ -98,7 +102,7 @@ fun CardsScreen(
             return@PullToRefreshBox
         }
         val displaySettings = LocalContext.current.app.displaySettings
-        val placements by displaySettings.placements.collectAsStateWithLifecycle()
+        val overrides by displaySettings.overrides.collectAsStateWithLifecycle()
         val pager = rememberCardPager(page, content.cards.size)
         LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
@@ -118,7 +122,10 @@ fun CardsScreen(
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 val card = content.cards[page]
                 // Aufteilung Karte / Details / Aus; Teilen nutzt weiter die vollständige Karte
-                val layout = remember(card, placements[card.id]) { CardLayout.of(card, placements[card.id].orEmpty()) }
+                val layout = remember(card, overrides[card.id]) {
+                    CardLayout.of(card, overrides[card.id] ?: DisplayOverrides(), CardSize.SMALL)
+                }
+                val details = remember(card) { CardLayout.details(card) }
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -130,7 +137,7 @@ fun CardsScreen(
                     DisplayScope(card)
                     ShareActions(card, onQr = { onQr(card) }, onNfc = { onNfc(card) })
                     ShareScope(card)
-                    DetailsList(layout.detailGroups)
+                    DetailsList(details)
                 }
             }
         }
@@ -169,7 +176,10 @@ internal fun rememberPhoto(card: CardItem): ImageBitmap? {
     return fromFile ?: inline
 }
 
-/** Die Visitenkarte: Kopf (Titel, Logo), Foto und Name, darunter die Themen in Datei-Reihenfolge. */
+/**
+ * Kleine Karte (Design „Klassisch“): oben Kartentitel, Name und Kopfangaben, rechts das Logo;
+ * darunter eine feine Linie und die Themen, unten ausgerichtet. Ganze Themen brechen gemeinsam um.
+ */
 @Composable
 fun BusinessCard(card: CardItem, layout: CardLayout, modifier: Modifier = Modifier) {
     val base = card.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
@@ -180,7 +190,7 @@ fun BusinessCard(card: CardItem, layout: CardLayout, modifier: Modifier = Modifi
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 220.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
         Column(
@@ -188,49 +198,47 @@ fun BusinessCard(card: CardItem, layout: CardLayout, modifier: Modifier = Modifi
                 .fillMaxWidth()
                 .heightIn(min = 220.dp)
                 .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.75f).compositeOver(Color.Black))))
-                .padding(20.dp),
-            // Kopf oben, Name und Themen unten – die Karte ist so hoch wie ihr Inhalt (mind. 220 dp)
+                .padding(22.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            // Oben: Kartentitel links, Logo rechts (bis 168 dp, Seitenverhältnis bleibt erhalten)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Text(
-                    card.title.uppercase(),
-                    color = onBase.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (logo != null) {
-                    val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
-                    val logoModifier = if (ratio >= 1f) {
-                        Modifier.width(LOGO_SIZE).aspectRatio(ratio)
-                    } else {
-                        Modifier.height(LOGO_SIZE).aspectRatio(ratio)
-                    }
-                    Image(logo, "Logo", logoModifier, contentScale = ContentScale.Fit)
-                }
-            }
-            Column(Modifier.padding(top = 16.dp)) {
-            // Foto, Name und Kopfangaben (Spitzname, Titel, Rolle, Firma)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 if (photo != null) {
-                    Image(
-                        photo, null,
-                        Modifier.size(72.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Spacer(Modifier.width(16.dp))
+                    Image(photo, null, Modifier.padding(top = 18.dp).size(64.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                    Spacer(Modifier.width(14.dp))
                 }
-                CardHeader(card, layout, onBase, MaterialTheme.typography.headlineSmall, MaterialTheme.typography.bodyLarge)
+                Column(Modifier.weight(1f)) {
+                    CardTitle(card.title, onBase, 10)
+                    Spacer(Modifier.height(6.dp))
+                    CardHeader(card, layout, onBase, MaterialTheme.typography.headlineSmall, MaterialTheme.typography.bodyMedium)
+                }
+                if (logo != null) {
+                    Spacer(Modifier.width(12.dp))
+                    CardLogo(logo, 120.dp, 72.dp)
+                }
             }
-            // Themen auf der Karte; ganze Themen brechen gemeinsam um
-            if (layout.cardGroups.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                GroupFlow(layout.cardGroups, onBase, MaterialTheme.typography.bodyMedium)
-            }
+            if (layout.groups.isNotEmpty()) {
+                Column(Modifier.padding(top = 18.dp)) {
+                    HorizontalDivider(color = onBase.copy(alpha = 0.25f))
+                    Spacer(Modifier.height(12.dp))
+                    EdgeGrid(layout.groups, onBase, listOf(MaterialTheme.typography.bodySmall), Modifier.fillMaxWidth(), columnGap = 22.dp, rowGap = 10.dp)
+                }
             }
         }
     }
+}
+
+/** Kartentitel in gesperrten Großbuchstaben („GESCHÄFTLICH“). */
+@Composable
+internal fun CardTitle(title: String, color: Color, sizeSp: Int) {
+    Text(title.uppercase(), color = color.copy(alpha = 0.55f), fontSize = sizeSp.sp, letterSpacing = 2.sp)
+}
+
+/** Logo, in eine Fläche von höchstens [maxWidth] × [maxHeight] eingepasst (Seitenverhältnis bleibt). */
+@Composable
+internal fun CardLogo(logo: ImageBitmap, maxWidth: Dp, maxHeight: Dp) {
+    val ratio = logo.width.toFloat() / logo.height.coerceAtLeast(1)
+    val w = if (maxWidth / ratio <= maxHeight) maxWidth else maxHeight * ratio
+    Image(logo, "Logo", Modifier.size(w, w / ratio), contentScale = ContentScale.Fit)
 }
 
 /** Name und Kopfangaben in Datei-Reihenfolge. */
@@ -240,12 +248,11 @@ internal fun CardHeader(card: CardItem, layout: CardLayout, color: Color, nameSt
         Text(card.vcard.formattedName, color = color, style = nameStyle, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         layout.header.forEach { item ->
             val text = if (item.kind == FieldKind.NICKNAME) "„${item.lines.first()}“" else item.lines.first()
-            Text(text, color = color.copy(alpha = 0.85f), style = style, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(text, color = color.copy(alpha = 0.8f), style = style, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-private val LOGO_SIZE = 168.dp
 
 internal fun Color.compositeOver(background: Color): Color {
     val a = alpha

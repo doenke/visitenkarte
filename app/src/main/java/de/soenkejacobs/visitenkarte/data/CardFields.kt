@@ -5,18 +5,19 @@ package de.soenkejacobs.visitenkarte.data
  * Alle Angaben eines Themas stehen immer zusammen und werden nie getrennt umgebrochen.
  *
  * @property header gehört in den Kopfbereich unter dem Namen (Titel, Firma …)
- * @property defaultOnCard Standard: auf der Karte (sonst nur in den Details)
+ * @property small Standard: auf der kleinen Karte (Hochformat)
+ * @property large Standard: auf der großen Karte (Vollbild quer)
  */
-enum class FieldKind(val title: String, val header: Boolean = false, val defaultOnCard: Boolean = false) {
-    NICKNAME("Spitzname", header = true, defaultOnCard = true),
-    TITLE("Titel", header = true, defaultOnCard = true),
-    ROLE("Rolle", header = true, defaultOnCard = true),
-    ORG("Firma", header = true, defaultOnCard = true),
-    PHONE("Telefon", defaultOnCard = true),
-    EMAIL("E-Mail", defaultOnCard = true),
-    WEB("Web", defaultOnCard = true),
-    ADDRESS("Adresse", defaultOnCard = true),
-    MESSENGER("Messenger & Profile"),
+enum class FieldKind(val title: String, val header: Boolean = false, val small: Boolean = false, val large: Boolean = false) {
+    NICKNAME("Spitzname", header = true, small = true, large = true),
+    TITLE("Titel", header = true, small = true, large = true),
+    ROLE("Rolle", header = true, small = true, large = true),
+    ORG("Firma", header = true, small = true, large = true),
+    PHONE("Telefon", small = true, large = true),
+    EMAIL("E-Mail", small = true, large = true),
+    WEB("Web", large = true),
+    ADDRESS("Adresse", small = true, large = true),
+    MESSENGER("Messenger & Profile", large = true),
     DATE("Daten"),
     RELATED("Kontakte"),
     GEO("Standort"),
@@ -30,11 +31,10 @@ enum class FieldKind(val title: String, val header: Boolean = false, val default
     OTHER("Weitere Angaben"),
 }
 
-/** Wo eine Angabe erscheint. */
-enum class Placement(val label: String) {
-    CARD("Karte"),
-    DETAILS("Details"),
-    HIDDEN("Aus"),
+/** Kleine Karte (Hochformat) oder große Karte (Vollbild quer). */
+enum class CardSize(val label: String) {
+    SMALL("Klein"),
+    LARGE("Groß"),
 }
 
 /**
@@ -222,6 +222,6 @@ object CardFields {
     internal fun prettyName(name: String): String =
         name.removePrefix("X-").replace('-', ' ').replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 
-    /** Wo eine Angabe standardmäßig erscheint. */
-    fun defaultPlacement(kind: FieldKind): Placement = if (kind.defaultOnCard) Placement.CARD else Placement.DETAILS
+    /** Steht eine Angabe dieses Themas standardmäßig auf der kleinen bzw. großen Karte? */
+    fun defaultOn(kind: FieldKind, size: CardSize): Boolean = if (size == CardSize.SMALL) kind.small else kind.large
 }
