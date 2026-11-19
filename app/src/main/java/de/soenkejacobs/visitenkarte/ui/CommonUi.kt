@@ -1,5 +1,7 @@
 package de.soenkejacobs.visitenkarte.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,21 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
-import de.soenkejacobs.visitenkarte.data.VCard
 import de.soenkejacobs.visitenkarte.data.ShareEntry
 import java.text.DateFormat
 import java.util.Date
@@ -120,30 +114,4 @@ fun ShareSelectionDialog(
         confirmButton = { TextButton(onClick = { onSave(selection) }) { Text("Speichern") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
     )
-}
-
-/**
- * Kontaktzeilen auf der Karte (Hochformat und Vollbild): erste Telefonnummer, Mail, Website
- * und darunter die Postanschrift. Was ausgeblendet ist, fehlt bereits in [v].
- */
-@Composable
-fun CardContactLines(v: VCard, color: Color, style: TextStyle) {
-    val contact = listOfNotNull(
-        v.phones.firstOrNull()?.value,
-        v.emails.firstOrNull()?.value,
-        v.urls.firstOrNull()?.value?.removePrefix("https://")?.removePrefix("http://")?.trimEnd('/'),
-    )
-    contact.forEach {
-        Text(it, color = color.copy(alpha = 0.85f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-    // Postanschrift: Straße (inkl. Zusatz) in einer Zeile, PLZ/Ort (Land nur, wenn nicht Deutschland) darunter
-    v.addresses.firstOrNull()?.let { adr ->
-        val second = listOf(adr.cityLine, if (adr.isDomestic) "" else adr.country)
-            .filter { it.isNotBlank() }.joinToString(", ")
-        val addressLines = listOf(adr.streetLines.joinToString(", "), second).filter { it.isNotBlank() }
-        if (addressLines.isNotEmpty() && contact.isNotEmpty()) Spacer(Modifier.height(6.dp))
-        addressLines.forEach {
-            Text(it, color = color.copy(alpha = 0.85f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
 }

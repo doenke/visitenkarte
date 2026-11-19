@@ -2,6 +2,7 @@ package de.soenkejacobs.visitenkarte
 
 import android.app.Application
 import android.content.Context
+import de.soenkejacobs.visitenkarte.data.DisplaySettings
 import de.soenkejacobs.visitenkarte.data.Repository
 import de.soenkejacobs.visitenkarte.data.SettingsStore
 import de.soenkejacobs.visitenkarte.data.ShareFilter
@@ -19,8 +20,8 @@ class VisitenkarteApp : Application() {
         private set
     lateinit var shareFilter: ShareFilter
         private set
-    /** Was auf der Karte in der App angezeigt wird. */
-    lateinit var displayFilter: ShareFilter
+    /** Wo welche Angabe in der App erscheint (Karte / Details / Aus). */
+    lateinit var displaySettings: DisplaySettings
         private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -29,7 +30,7 @@ class VisitenkarteApp : Application() {
         super.onCreate()
         repository = Repository(this, SettingsStore(this))
         shareFilter = ShareFilter(this)
-        displayFilter = ShareFilter(this, "display_filter")
+        displaySettings = DisplaySettings(this)
         SyncWorker.schedule(this)
 
         // Shortcuts und Widgets aktuell halten

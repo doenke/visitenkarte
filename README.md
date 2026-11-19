@@ -15,7 +15,7 @@ Alle Inhalte kommen von deinem eigenen Webserver (HTTPS + Basic Auth) und werden
 | **Teilen** | Normaler Android-Teilen-Dialog mit `.vcf`-Datei (Messenger, Mail, …). |
 | **Quick Share** | Öffnet Quick Share (Google bzw. Samsung) direkt; falls nicht vorhanden, den Teilen-Dialog. |
 | **Dokumente** | PDF (eingebauter Viewer mit Zoom), HTML (offline, ohne JavaScript/Netz), Bilder, Text. Teilen und „Extern öffnen“ möglich. |
-| **Was wird angezeigt?** | Pro Karte auswählbar, welche Angaben die Karte in der App zeigt (auch Foto und Logo) – gilt für Karte, Kontaktdetails und Vollbild. Unabhängig davon, was geteilt wird. |
+| **Was wird angezeigt?** | Die Karte wird dynamisch aus der vCard gebaut: jede Eigenschaft des Standards (Telefon, Mail, Web, Adresse, Messenger, Daten, Standort, Sprachen, Notiz …, auch unbekannte `X-…`-Felder und Apple-Bezeichnungen `X-ABLabel`) wird dargestellt. Angaben sind nach Themen gruppiert – alle Telefonnummern, alle Mails usw. stehen immer zusammen, in der Reihenfolge der `.vcf`-Datei. Pro Angabe wählbar: **Karte**, **Details** (nur Liste darunter) oder **Aus**; ebenso Foto und Logo. Umgebrochen werden immer ganze Themen; im Querformat wird die Schrift bei Bedarf kleiner, bevor ein Thema entfällt. |
 | **Was wird geteilt?** | Pro Karte abwählbar (z. B. Privatadresse, Geburtstag). Gilt für QR-Code, NFC, Teilen, Quick Share, Vollbild und Widget – die eigene Anzeige zeigt weiter alles. |
 | **Shortcuts** | Lange auf das App-Icon tippen: „QR Geschäftlich“, „QR Privat“, „NFC …“ öffnen direkt die passende Ansicht. |
 | **Widget** | QR-Code einer Karte auf dem Startbildschirm. Tippen auf den Titel wechselt die Karte, Tippen auf den Code öffnet die App. |

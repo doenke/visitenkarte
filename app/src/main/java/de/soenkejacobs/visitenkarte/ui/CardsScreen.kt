@@ -1,14 +1,11 @@
 package de.soenkejacobs.visitenkarte.ui
 
-import android.content.Intent
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import android.graphics.BitmapFactory
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,20 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Cake
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Nfc
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.soenkejacobs.visitenkarte.app
@@ -76,7 +64,9 @@ import androidx.compose.ui.unit.dp
 import de.soenkejacobs.visitenkarte.data.CardItem
 import de.soenkejacobs.visitenkarte.data.ShareEntry
 import de.soenkejacobs.visitenkarte.data.ShareFilter
-import de.soenkejacobs.visitenkarte.data.displayEntries
+import de.soenkejacobs.visitenkarte.data.CardLayout
+import de.soenkejacobs.visitenkarte.data.FieldKind
+import androidx.compose.ui.text.TextStyle
 import de.soenkejacobs.visitenkarte.data.ContentState
 import de.soenkejacobs.visitenkarte.data.SyncState
 import de.soenkejacobs.visitenkarte.share.ShareHelper
@@ -107,8 +97,8 @@ fun CardsScreen(
             )
             return@PullToRefreshBox
         }
-        val displayFilter = LocalContext.current.app.displayFilter
-        val hidden by displayFilter.excluded.collectAsStateWithLifecycle()
+        val displaySettings = LocalContext.current.app.displaySettings
+        val placements by displaySettings.placements.collectAsStateWithLifecycle()
         val pager = rememberCardPager(page, content.cards.size)
         LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
         val scope = rememberCoroutineScope()
@@ -127,8 +117,8 @@ fun CardsScreen(
             }
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 val card = content.cards[page]
-                // Für die Anzeige ausgeblendete Angaben entfernen; Teilen nutzt weiter die vollständige Karte
-                val shown = remember(card, hidden[card.id]) { displayFilter.displayed(card) }
+                // Aufteilung Karte / Details / Aus; Teilen nutzt weiter die vollständige Karte
+                val layout = remember(card, placements[card.id]) { CardLayout.of(card, placements[card.id].orEmpty()) }
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -136,11 +126,11 @@ fun CardsScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    BusinessCard(shown)
+                    BusinessCard(card, layout)
                     DisplayScope(card)
                     ShareActions(card, onQr = { onQr(card) }, onNfc = { onNfc(card) })
                     ShareScope(card)
-                    ContactDetails(shown)
+                    DetailsList(layout.detailGroups)
                 }
             }
         }
@@ -179,14 +169,13 @@ internal fun rememberPhoto(card: CardItem): ImageBitmap? {
     return fromFile ?: inline
 }
 
-/** Die Visitenkarte im klassischen Format (85 × 55 mm). */
+/** Die Visitenkarte: Kopf (Titel, Logo), Foto und Name, darunter die Themen in Datei-Reihenfolge. */
 @Composable
-fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
+fun BusinessCard(card: CardItem, layout: CardLayout, modifier: Modifier = Modifier) {
     val base = card.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val onBase = if (base.luminance() > 0.5f) Color(0xFF111111) else Color.White
-    val photo = rememberPhoto(card)
-    val logo = rememberImage(card.logoFile)
-    val v = card.vcard
+    val photo = rememberPhoto(card).takeIf { layout.showPhoto }
+    val logo = rememberImage(card.logoFile).takeIf { layout.showLogo }
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -200,6 +189,8 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                 .heightIn(min = 220.dp)
                 .background(Brush.linearGradient(listOf(base, base.copy(alpha = 0.75f).compositeOver(Color.Black))))
                 .padding(20.dp),
+            // Kopf oben, Name und Themen unten – die Karte ist so hoch wie ihr Inhalt (mind. 220 dp)
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             // Oben: Kartentitel links, Logo rechts (bis 168 dp, Seitenverhältnis bleibt erhalten)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -219,8 +210,8 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                     Image(logo, "Logo", logoModifier, contentScale = ContentScale.Fit)
                 }
             }
-            Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
-            // Unten: Foto und Name
+            Column(Modifier.padding(top = 16.dp)) {
+            // Foto, Name und Kopfangaben (Spitzname, Titel, Rolle, Firma)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (photo != null) {
                     Image(
@@ -230,16 +221,26 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                     )
                     Spacer(Modifier.width(16.dp))
                 }
-                Column {
-                    Text(v.formattedName, color = onBase, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    v.nickname?.let { Text("„$it“", color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium) }
-                    v.title?.let { Text(it, color = onBase.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyLarge) }
-                    v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium) }
-                }
+                CardHeader(card, layout, onBase, MaterialTheme.typography.headlineSmall, MaterialTheme.typography.bodyLarge)
             }
-            // Kontakt und Postanschrift (je nach Anzeige-Auswahl)
-            Spacer(Modifier.height(12.dp))
-            Column { CardContactLines(v, onBase, MaterialTheme.typography.bodyMedium) }
+            // Themen auf der Karte; ganze Themen brechen gemeinsam um
+            if (layout.cardGroups.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                GroupFlow(layout.cardGroups, onBase, MaterialTheme.typography.bodyMedium)
+            }
+            }
+        }
+    }
+}
+
+/** Name und Kopfangaben in Datei-Reihenfolge. */
+@Composable
+internal fun CardHeader(card: CardItem, layout: CardLayout, color: Color, nameStyle: TextStyle, style: TextStyle) {
+    Column {
+        Text(card.vcard.formattedName, color = color, style = nameStyle, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        layout.header.forEach { item ->
+            val text = if (item.kind == FieldKind.NICKNAME) "„${item.lines.first()}“" else item.lines.first()
+            Text(text, color = color.copy(alpha = 0.85f), style = style, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -283,22 +284,6 @@ private fun ShareScope(card: CardItem) {
         icon = { Icons.Default.Share },
         dialogTitle = "Was wird geteilt?",
         dialogHint = "Gilt für QR-Code, NFC, Teilen, Quick Share und Widget. Name ist immer enthalten.",
-    )
-}
-
-/** Zeigt, was auf der Karte angezeigt wird, und öffnet die Auswahl. */
-@Composable
-private fun DisplayScope(card: CardItem) {
-    FieldScope(
-        card = card,
-        filter = LocalContext.current.app.displayFilter,
-        entries = remember(card) { card.displayEntries() },
-        allText = "Alle Angaben werden angezeigt",
-        omittedPrefix = "Ausgeblendet: ",
-        icon = { omitted -> if (omitted) Icons.Default.VisibilityOff else Icons.Default.Visibility },
-        dialogTitle = "Was wird angezeigt?",
-        dialogHint = "Gilt für die Karte und die Kontaktdetails in der App sowie das Vollbild im Querformat. " +
-            "Was geteilt wird, stellst du separat ein. Name ist immer sichtbar.",
     )
 }
 
@@ -348,54 +333,5 @@ private fun ActionButton(icon: ImageVector, label: String, modifier: Modifier, o
         Icon(icon, null)
         Spacer(Modifier.width(8.dp))
         Text(label)
-    }
-}
-
-@Composable
-private fun ContactDetails(card: CardItem) {
-    val context = LocalContext.current
-    val v = card.vcard
-    fun open(uri: String) {
-        try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
-        } catch (e: Exception) {
-            Toast.makeText(context, "Keine passende App gefunden", Toast.LENGTH_SHORT).show()
-        }
-    }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(vertical = 8.dp)) {
-            v.phones.forEach { DetailRow(Icons.Default.Phone, it.label, it.value) { open("tel:${it.value.filter { c -> c.isDigit() || c == '+' }}") } }
-            v.emails.forEach { DetailRow(Icons.Default.Email, it.label, it.value) { open("mailto:${it.value}") } }
-            v.urls.forEach {
-                DetailRow(Icons.Default.Language, it.label, it.value) {
-                    open(if (it.value.contains("://")) it.value else "https://${it.value}")
-                }
-            }
-            v.addresses.forEach {
-                DetailRow(Icons.Default.Place, it.label, it.lines.joinToString("\n")) { open("geo:0,0?q=${Uri.encode(it.singleLine)}") }
-            }
-            v.birthdayFormatted?.let { DetailRow(Icons.Default.Cake, "Geburtstag", it) {} }
-            v.note?.let {
-                Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(16.dp))
-        Column {
-            Text(value, style = MaterialTheme.typography.bodyLarge)
-            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
