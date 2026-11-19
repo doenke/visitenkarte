@@ -180,24 +180,7 @@ private fun FullscreenCard(card: CardItem, shown: CardItem) {
                 v.title?.let { Text(it, color = onBase.copy(alpha = 0.9f), style = MaterialTheme.typography.titleLarge) }
                 v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(10.dp))
-                val lines = listOfNotNull(
-                    v.phones.firstOrNull()?.value,
-                    v.emails.firstOrNull()?.value,
-                    v.urls.firstOrNull()?.value?.removePrefix("https://")?.removePrefix("http://"),
-                )
-                lines.forEach {
-                    Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                // Postanschrift: Straße (inkl. Zusatz) in einer Zeile, PLZ/Ort (Land nur, wenn nicht Deutschland) darunter
-                v.addresses.firstOrNull()?.let { adr ->
-                    val second = listOf(adr.cityLine, if (adr.isDomestic) "" else adr.country)
-                        .filter { it.isNotBlank() }.joinToString(", ")
-                    val addressLines = listOf(adr.streetLines.joinToString(", "), second).filter { it.isNotBlank() }
-                    if (addressLines.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                    addressLines.forEach {
-                        Text(it, color = onBase.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
+                CardContactLines(v, onBase, MaterialTheme.typography.bodyLarge)
             }
         }
 

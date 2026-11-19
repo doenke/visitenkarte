@@ -237,6 +237,9 @@ fun BusinessCard(card: CardItem, modifier: Modifier = Modifier) {
                     v.organization?.let { Text(it, color = onBase.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium) }
                 }
             }
+            // Kontakt und Postanschrift (je nach Anzeige-Auswahl)
+            Spacer(Modifier.height(12.dp))
+            Column { CardContactLines(v, onBase, MaterialTheme.typography.bodyMedium) }
         }
     }
 }
