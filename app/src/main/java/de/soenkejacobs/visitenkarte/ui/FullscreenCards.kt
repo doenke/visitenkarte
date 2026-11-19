@@ -125,8 +125,8 @@ private fun onColorFor(base: Color): Color = if (base.luminance() > 0.5f) Color(
 
 /**
  * Große Karte (Design „Klassisch“): oben Kartentitel, Name und Kopfangaben; unten eine feine
- * Linie und die Themen im Raster – die rechte Spalte rechtsbündig am QR-Code. Rechts der QR-Code,
- * darüber das Logo.
+ * Linie und die Themen im Raster – die rechte Spalte rechtsbündig am QR-Code. Rechts oben das Logo,
+ * rechts unten der QR-Code.
  */
 @Composable
 internal fun FullscreenCard(card: CardItem, layout: CardLayout, qrText: String) {
@@ -169,11 +169,10 @@ internal fun FullscreenCard(card: CardItem, layout: CardLayout, qrText: String) 
                 }
             }
             Spacer(Modifier.width(24.dp))
-            Column(Modifier.fillMaxHeight(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Bottom) {
-                if (logo != null) {
-                    CardLogo(logo, qrSize, logoMaxHeight)
-                    Spacer(Modifier.height(16.dp))
-                }
+            // Rechts: Logo oben (auf Höhe des Namens), QR-Code unten
+            Column(Modifier.fillMaxHeight(), horizontalAlignment = Alignment.End) {
+                if (logo != null) CardLogo(logo, qrSize, logoMaxHeight)
+                Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
                 if (qr != null) {
                     Box(
                         Modifier
